@@ -1,3 +1,3 @@
 # AGENTS.md
 
-Define durable outcomes, artifact contracts, and authority boundaries. Leave execution strategy to the Agent Host unless correctness, safety, or explicit user intent requires a constraint.
+Keep standing instructions minimal. Codify only durable, non-obvious constraints required for correctness, safety, or explicit user intent. Do not prescribe tactics merely to compensate for current model limitations, because those instructions can interfere with more capable future Agent Hosts.
