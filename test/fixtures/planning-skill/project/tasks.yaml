@@ -1,0 +1,90 @@
+project: autodev-rebuild
+source: docs/project-overview.md
+tasks:
+  - id: establish-portable-project-contract
+    title: Establish the portable project contract
+    depends_on: []
+    references:
+      - docs/project-overview.md#scope
+      - docs/project-overview.md#decisions
+    outcome: A project can locate exactly one canonical Overview, one local YAML Task Graph, and one pending or approved record through minimal project-local configuration.
+    verify:
+      - Create a fresh project from the delivered template and confirm every configured artifact path is project-relative and resolves inside that project.
+      - Confirm the template contains one Overview and one Task Graph and starts with approval pending.
+
+  - id: produce-decision-complete-overview
+    title: Produce a decision-complete Project Overview
+    depends_on:
+      - establish-portable-project-contract
+    references:
+      - docs/project-overview.md#goal
+      - docs/project-overview.md#success-criteria
+    outcome: A rough software or non-software request is reduced through material, grouped questions into the single canonical Overview, with no duplicate brief or interview transcript.
+    verify:
+      - Exercise an underspecified request and confirm every question can change a documented decision, dependency, risk, or verification result.
+      - Confirm resolved decisions are not asked again and Open questions becomes `None.` only after the material frontier is empty.
+
+  - id: reuse-selected-markdown-knowledge
+    title: Reuse selected Markdown knowledge safely
+    depends_on:
+      - establish-portable-project-contract
+    references:
+      - docs/project-overview.md#scope
+      - docs/project-overview.md#decisions
+      - docs/project-overview.md#success-criteria
+    outcome: Planning searches only explicitly selected read-only Markdown roots, uses only decision-relevant records, and records safe citations plus what was and was not adopted.
+    verify:
+      - Run a fixture with selected and unselected roots and confirm only plausible Markdown files under the selected roots are read.
+      - Compare selected-root file digests before and after planning and confirm they are unchanged.
+      - Confirm affected Overview content cites the selected root and root-relative source without exposing a private absolute path.
+
+  - id: derive-verifiable-task-graph
+    title: Derive the verifiable Task Graph
+    depends_on:
+      - produce-decision-complete-overview
+    references:
+      - docs/project-overview.md#decisions
+      - docs/project-overview.md#success-criteria
+    outcome: The local YAML Task Graph expresses the Overview as uniquely identified, dependency-aware outcomes with project-local references and concrete checks, without Host-specific tactics.
+    verify:
+      - Confirm software and non-software examples each produce an acyclic graph whose tasks trace to the Overview and contain non-empty outcomes and checks.
+      - Confirm no task reference escapes the project or points to a missing planning file.
+
+  - id: bind-approval-to-reviewed-bytes
+    title: Bind explicit approval to the reviewed bytes
+    depends_on:
+      - derive-verifiable-task-graph
+      - reuse-selected-markdown-knowledge
+    references:
+      - docs/project-overview.md#decisions
+      - docs/project-overview.md#success-criteria
+    outcome: Approval stays pending until the complete revision is shown and explicitly accepted, then records the approver, time, exact file set, and matching SHA-256 digests without modifying the approved artifacts.
+    verify:
+      - Confirm the initial request, silence, and a non-approval acknowledgment leave the record pending.
+      - Explicitly approve a fixture, confirm both digests match the displayed bytes, then change one byte and confirm the approval no longer validates.
+
+  - id: validate-project-before-handoff
+    title: Validate the project before handoff
+    depends_on:
+      - bind-approval-to-reviewed-bytes
+    references:
+      - docs/project-overview.md#decisions
+      - docs/project-overview.md#success-criteria
+    outcome: A deterministic validation entry point accepts only a decision-complete, structurally valid, exactly approved project and reports one actionable failure when the contract is violated.
+    verify:
+      - Run validation fixtures covering unresolved questions, empty and duplicate task IDs, unknown and cyclic dependencies, missing references or checks, pending or incomplete approval, the wrong file set, and digest mismatch; confirm each is rejected.
+      - Run the complete approved fixture and confirm validation succeeds without modifying project files.
+
+  - id: prove-host-neutral-approved-handoff
+    title: Prove the host-neutral approved handoff
+    depends_on:
+      - validate-project-before-handoff
+    references:
+      - docs/project-overview.md#goal
+      - docs/project-overview.md#out-of-scope
+      - docs/project-overview.md#success-criteria
+    outcome: An existing Agent Host can discover and validate an approved software or non-software project through the documented contract, while Autodev stops before any task executes.
+    verify:
+      - Complete one software and one non-software planning fixture through approval and validation and confirm both handoffs require no Host-specific artifact or adapter.
+      - Confirm no task from either fixture executes during planning, approval, or validation.
+      - Inspect the delivered first release and confirm it contains no runner, daemon, dashboard, vendor adapter, knowledge index, vector database, or legacy migration layer.

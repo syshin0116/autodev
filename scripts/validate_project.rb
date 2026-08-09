@@ -82,8 +82,7 @@ module Autodev
       match = text.match(/\A---[ \t]*\r?\n(?<yaml>.*?)\r?\n---[ \t]*\r?\n/m)
       invalid!("project overview is missing YAML frontmatter") unless match
 
-      metadata = parse_yaml!(match[:yaml], "project overview frontmatter", path.to_s)
-      invalid!("project overview status must be approved") unless metadata["status"] == "approved"
+      parse_yaml!(match[:yaml], "project overview frontmatter", path.to_s)
 
       section = text.match(/^##[ \t]+Open questions[ \t]*\r?$\n(?<body>.*?)(?=^##[ \t]+|\z)/im)
       invalid!("project overview is missing the Open questions section") unless section
@@ -95,7 +94,6 @@ module Autodev
 
     def validate_tasks!(root, path)
       document = yaml!(path, "task graph")
-      invalid!("task graph status must be approved") unless document["status"] == "approved"
       tasks = document["tasks"]
       invalid!("task graph must contain at least one task") unless tasks.is_a?(Array) && !tasks.empty?
 
