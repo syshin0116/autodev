@@ -1,0 +1,5 @@
+project_overview: docs/project-overview.md
+task_source:
+  kind: local
+  path: tasks.yaml
+approval_record: .autodev/approval.yaml

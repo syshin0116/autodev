@@ -1,6 +1,8 @@
+project: autodev
+status: approved
 approved_by: user
 approved_at: 2026-08-09
-source: chat, terminology-and-disclosure-update
+source: chat, explicit approval of first-version revision and ADR 0001
 files:
-  .autodev/overview.md: c60b7fa4095efed690184a81c68e11e9d6ebdb7119235395111a175e90e28c14
-  .autodev/tasks.yaml: dbc6e4a7e73afed08f652e845ce84f2b91431fb0ef32c06a3c751fcb9c2697f2
+  docs/project-overview.md: fe1493a59f0c23304fa2abf5d69a83cca3d4f6bfc15238d968e9f8acad1f13b1
+  tasks.yaml: d7cc1075a13bb7961aa901601f166da1f15fb3154c2ecc8d29260f642fd14620
