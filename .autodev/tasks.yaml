@@ -11,22 +11,24 @@ tasks:
       - Rename the current GitHub repository to autodev-archive
       - Mark it as archived
       - Create a new autodev repository
-      - Move this approved project source and task graph into the new repository
+      - Move this approved Project Overview and Task Graph into the new repository
     verify:
       - The archived repository is read-only at its new URL
       - The new repository exists under the autodev name
 
   - id: T2
-    title: Initialize the portable autodev skill
+    title: Initialize the portable Autodev Agent Skill
     depends_on: [T1]
     satisfies:
-      - The same workflow can be installed in Codex and Claude Code
+      - The same workflow can be installed in Agent Skills compatible Agent Hosts
     work:
       - Initialize one Agent Skill package using the skill-creator tooling
       - Keep SKILL.md concise and place only necessary details in direct references
+      - Make omission of obvious content and progressive disclosure standing rules for every generated artifact
     verify:
-      - Run the Codex skill validator successfully
-      - Confirm the package uses the common SKILL.md format accepted by Claude Code
+      - Validate the package against the Agent Skills specification
+      - Keep product-specific extensions out of the core Agent Skill
+      - Confirm the main skill does not duplicate detail held in references
 
   - id: T3
     title: Define the project and approval contract
@@ -35,7 +37,7 @@ tasks:
       - A project has one canonical source
       - Execution requires approval of current content
     work:
-      - Add the minimal project source and task graph templates
+      - Add the minimal Project Overview and Task Graph templates
       - Add a standard-library check for open questions, task dependencies, verification fields, and approval hash
     verify:
       - The check rejects unresolved questions, invalid dependencies, missing verification, and changed approved content
@@ -70,19 +72,21 @@ tasks:
       - Stop before execution when questions or approval checks fail
       - Produce evidence-backed knowledge candidates after execution
       - End each project by asking the user to accept, merge, discard, or defer each newly inferred learning
+      - Remove statements that do not affect a decision, action, constraint, or verification result
+      - Present Project Overview summaries before linked Decision Records and Evidence
     verify:
       - Run the workflow on the autodev project itself through the approval boundary
 
   - id: T6
-    title: Validate both runtime integrations
+    title: Validate Agent Host portability
     depends_on: [T5]
     satisfies:
-      - The first version works in Codex and Claude Code
+      - The first version works in at least two Agent Hosts
     work:
-      - Install the same skill package in each runtime
+      - Install the same Agent Skill package in two initial Agent Hosts
       - Run the same small project fixture in both
-      - Record differences that require a runtime-specific note
+      - Record differences that require a host-specific note
     verify:
-      - Both runtimes produce a project source and task graph from the fixture
-      - Neither runtime starts execution without explicit approval
+      - Both Agent Hosts produce a Project Overview and Task Graph from the fixture
+      - Neither Agent Host starts execution without explicit approval
       - Any new learning remains a candidate until user acceptance
