@@ -53,7 +53,7 @@ The first milestone ends at the approved handoff. Execution and learning reuse t
 - Review new candidates in one batch at project close. A deferred candidate remains searchable and may resurface during later relevant work without blocking closure.
 - Present the minimum decision-relevant summary first, then link to Decision Records and raw evidence.
 
-These boundaries are proposed in [ADR 0001](../adr/0001-thin-first-version.md).
+These boundaries are accepted in [ADR 0001](../adr/0001-thin-first-version.md).
 
 ## Success criteria
 

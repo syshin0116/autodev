@@ -4,5 +4,5 @@ approved_by: user
 approved_at: 2026-08-09
 source: chat, explicit approval of first-version revision and ADR 0001
 files:
-  docs/project-overview.md: fe1493a59f0c23304fa2abf5d69a83cca3d4f6bfc15238d968e9f8acad1f13b1
+  docs/project-overview.md: d6581f19053aa0042560006373a80165df5b115540477aae52c635c9ed2d1994
   tasks.yaml: d7cc1075a13bb7961aa901601f166da1f15fb3154c2ecc8d29260f642fd14620
