@@ -1,0 +1,88 @@
+project: autodev
+status: approved
+tasks:
+  - id: T1
+    title: Transition the repositories
+    depends_on: []
+    satisfies:
+      - Preserve the current repository as history
+      - Reuse the autodev name for the new implementation
+    work:
+      - Rename the current GitHub repository to autodev-archive
+      - Mark it as archived
+      - Create a new autodev repository
+      - Move this approved project source and task graph into the new repository
+    verify:
+      - The archived repository is read-only at its new URL
+      - The new repository exists under the autodev name
+
+  - id: T2
+    title: Initialize the portable autodev skill
+    depends_on: [T1]
+    satisfies:
+      - The same workflow can be installed in Codex and Claude Code
+    work:
+      - Initialize one Agent Skill package using the skill-creator tooling
+      - Keep SKILL.md concise and place only necessary details in direct references
+    verify:
+      - Run the Codex skill validator successfully
+      - Confirm the package uses the common SKILL.md format accepted by Claude Code
+
+  - id: T3
+    title: Define the project and approval contract
+    depends_on: [T2]
+    satisfies:
+      - A project has one canonical source
+      - Execution requires approval of current content
+    work:
+      - Add the minimal project source and task graph templates
+      - Add a standard-library check for open questions, task dependencies, verification fields, and approval hash
+    verify:
+      - The check rejects unresolved questions, invalid dependencies, missing verification, and changed approved content
+      - The check accepts one valid approved fixture
+
+  - id: T4
+    title: Connect user-owned knowledge
+    depends_on: [T2]
+    satisfies:
+      - Users can bring their own knowledge without storing it in autodev
+    work:
+      - Define multiple Markdown read roots selected per project
+      - Define exactly one writable knowledge-candidate inbox per project
+      - Teach the skill to classify retrieved knowledge as follow, adapt, conflict, or new
+      - Define one mandatory project overview that links context, material decisions, compared options, outcomes, and evidence
+      - Keep overview summaries concise while placing decision detail and raw evidence in linked records
+      - Promote decisions covered by project approval without requesting duplicate approval
+      - Resurface deferred candidates during retrieval for a related project
+    verify:
+      - A fixture project reads two knowledge roots
+      - Candidate output is written only to the configured inbox
+      - A reader can trace one fixture decision from its project overview to options, rationale, outcome, and source evidence
+      - An approved project decision needs no second approval, while a deferred learning appears in a related retrieval
+
+  - id: T5
+    title: Implement the core workflow
+    depends_on: [T3, T4]
+    satisfies:
+      - Ideas and opportunities become approved, executable project plans
+    work:
+      - Implement remember, interview, reduce, plan, approve, execute, verify, and learn as skill instructions
+      - Stop before execution when questions or approval checks fail
+      - Produce evidence-backed knowledge candidates after execution
+      - End each project by asking the user to accept, merge, discard, or defer each newly inferred learning
+    verify:
+      - Run the workflow on the autodev project itself through the approval boundary
+
+  - id: T6
+    title: Validate both runtime integrations
+    depends_on: [T5]
+    satisfies:
+      - The first version works in Codex and Claude Code
+    work:
+      - Install the same skill package in each runtime
+      - Run the same small project fixture in both
+      - Record differences that require a runtime-specific note
+    verify:
+      - Both runtimes produce a project source and task graph from the fixture
+      - Neither runtime starts execution without explicit approval
+      - Any new learning remains a candidate until user acceptance
