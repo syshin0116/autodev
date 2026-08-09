@@ -1,0 +1,63 @@
+project: autodev
+status: approved
+source: docs/project-overview.md
+tasks:
+  - id: project-contract
+    title: Define the project and approval contract
+    depends_on: []
+    references:
+      - docs/project-overview.md#decisions
+      - adr/0001-thin-first-version.md
+    outcome: >-
+      A project exposes one visible Project Overview and one local Task Graph,
+      keeps machine configuration and approval state under .autodev, and stores
+      execution evidence outside the approved planning revision.
+    verify:
+      - A standard-library check accepts one valid approved fixture.
+      - The check rejects material open questions, unknown or cyclic dependencies, and missing verification.
+      - The check rejects missing approval and either planning artifact changing after approval.
+
+  - id: knowledge-aware-planning-skill
+    title: Build the knowledge-aware planning Skill
+    depends_on: [project-contract]
+    references:
+      - docs/project-overview.md#flow
+      - docs/project-overview.md#success-criteria
+    outcome: >-
+      One portable Agent Skill reads selected Markdown knowledge roots, asks only
+      questions whose answers can alter the plan, writes a concise Project
+      Overview, and derives the Task Graph for approval.
+    verify:
+      - The autodev project reaches the approval boundary from rough input through the unchanged Skill package.
+      - One relevant prior record is cited without being treated as binding.
+      - The resulting tasks link to planning sources without repeating their prose.
+
+  - id: approved-execution-and-learning
+    title: Close the execution and learning loop
+    depends_on: [knowledge-aware-planning-skill]
+    references:
+      - docs/project-overview.md#decisions
+      - docs/project-overview.md#success-criteria
+    outcome: >-
+      The existing Agent Host executes only an approved planning revision, records
+      verification evidence separately, and proposes reusable learnings to the
+      selected external candidate inbox.
+    verify:
+      - An altered approved input blocks execution and an unchanged input permits one real task.
+      - Completion evidence identifies the checked artifact, test, or human review.
+      - A candidate includes its context, applicability, and evidence and remains unaccepted until review.
+      - Duplicate or dismissed knowledge is not proposed again in the fixture.
+
+  - id: portability-check
+    title: Validate portability and non-software use
+    depends_on: [approved-execution-and-learning]
+    references:
+      - docs/project-overview.md#users
+      - docs/project-overview.md#success-criteria
+    outcome: >-
+      The unchanged core Skill crosses the approval boundary in a second Agent
+      Host and handles a non-software fixture without code-only assumptions.
+    verify:
+      - Both Agent Hosts produce the same artifact types and enforce the approval gate.
+      - Actual Host differences are isolated outside the core design contract.
+      - A supplied opportunity reaches an approved Overview and Task Graph.
