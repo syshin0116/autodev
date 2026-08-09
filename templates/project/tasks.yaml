@@ -1,0 +1,12 @@
+project: replace-with-project-id
+status: proposed
+source: docs/project-overview.md
+tasks:
+  - id: first-verifiable-outcome
+    title: Replace with a clear outcome
+    depends_on: []
+    references:
+      - docs/project-overview.md#success-criteria
+    outcome: Replace with the state this task must create.
+    verify:
+      - Replace with a runnable or human-verifiable check.
