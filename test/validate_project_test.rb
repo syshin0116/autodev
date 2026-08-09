@@ -106,14 +106,11 @@ class ValidateProjectTest < Minitest::Test
 
       overview_path = root.join("docs/project-overview.md")
       overview = overview_path.read
-        .sub("status: proposed", "status: approved")
-        .sub("approval: pending", "approval: user-approved")
         .sub(/- Replace this line.*$/, "None.")
       overview_path.write(overview)
 
       tasks = read_yaml(root.join("tasks.yaml"))
       tasks["project"] = "fixture"
-      tasks["status"] = "approved"
       write_yaml(root.join("tasks.yaml"), tasks)
 
       write_yaml(root.join(".autodev/approval.yaml"), {

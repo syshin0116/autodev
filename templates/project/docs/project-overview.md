@@ -1,14 +1,12 @@
 ---
 id: replace-with-project-id
-status: proposed
-approval: pending
 ---
 
 # Project Overview
 
 ## Background
 
-<!-- Include only context that changes a decision or how the result will be judged. -->
+<!-- Include only context that changes a decision or how the result will be judged. Cite prior records beside the content they informed. -->
 
 ## Goal
 

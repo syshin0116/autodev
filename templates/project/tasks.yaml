@@ -1,5 +1,4 @@
 project: replace-with-project-id
-status: proposed
 source: docs/project-overview.md
 tasks:
   - id: first-verifiable-outcome
