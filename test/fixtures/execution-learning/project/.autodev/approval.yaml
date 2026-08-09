@@ -1,0 +1,7 @@
+project: volunteer-check-in
+status: approved
+approved_by: user
+approved_at: "2026-08-10"
+files:
+  docs/project-overview.md: c7b0fb3b600712fb26de21467cff9ab7a7f95fa0c2961fc6acbbd3293e672828
+  tasks.yaml: 92b0ccccc2b6b0dc5b94fa31ccd69323a0c3a0483f670b9f12dba085a18c2d90

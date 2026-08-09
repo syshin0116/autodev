@@ -1,0 +1,13 @@
+project: volunteer-check-in
+source: docs/project-overview.md
+tasks:
+  - id: build-check-in-sheet
+    title: Build the volunteer check-in sheet
+    depends_on: []
+    references:
+      - docs/project-overview.md#success-criteria
+    outcome: Create output/check-in.md from the supplied CSV without changing any source value.
+    verify:
+      - The output contains exactly two list entries.
+      - The output contains `001 | Kim, Mina | 09:00` and `002 | Lee Jun | 09:15`.
+      - Each output entry can be traced to one source row.
