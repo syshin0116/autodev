@@ -1,7 +1,10 @@
 ---
 task: knowledge-aware-planning-skill
 status: verified
-verified_at: 2026-08-10
+verified_at: "2026-08-10"
+planning_revision:
+  docs/project-overview.md: d6581f19053aa0042560006373a80165df5b115540477aae52c635c9ed2d1994
+  tasks.yaml: d7cc1075a13bb7961aa901601f166da1f15fb3154c2ecc8d29260f642fd14620
 ---
 
 # Knowledge-aware planning Skill verification

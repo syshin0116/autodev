@@ -14,7 +14,8 @@ This repository contains the design record and the thin portable implementation.
 - [Runtime mapping](docs/10-runtime-mapping.md)
 - [Project contract verification](evidence/project-contract.md)
 - [Planning Skill verification](evidence/knowledge-aware-planning-skill.md)
+- [Execution and learning verification](evidence/approved-execution-and-learning.md)
 
 `.autodev/` contains machine-readable configuration and approval state. The current planning revision is approved in `.autodev/approval.yaml`; changing either planning artifact invalidates that approval.
 
-Install this repository through an Agent Skills compatible Host, then invoke `autodev` with a rough idea. The Skill selects relevant records from configured Markdown roots, interviews until material questions are closed, writes the two planning artifacts, and asks for approval before execution.
+Install this repository through an Agent Skills compatible Host, then invoke `autodev` with a rough idea. The Skill reaches a content-bound approval, then a later execution request runs one ready task, records verification evidence, and proposes only novel, sourced learning candidates to an authorized inbox.
