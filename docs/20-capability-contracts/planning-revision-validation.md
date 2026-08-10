@@ -1,4 +1,4 @@
-# Project Validation Capability
+# Planning Revision Validation Capability
 
 ## Purpose
 
@@ -12,9 +12,9 @@ Prevent execution against an unresolved or unapproved planning revision.
 
 The configured Project Overview and Task Graph paths must be project-relative and resolve inside the project root. The Approval Record is `.autodev/approval.yaml`.
 
-## Valid project
+## Valid planning revision
 
-A project is valid when all of the following hold:
+A planning revision is valid when all of the following hold:
 
 - Its `Open questions` section begins with `None` after comments and whitespace are removed.
 - The Task Graph contains at least one task.

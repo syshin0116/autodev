@@ -8,13 +8,13 @@ approval: user-selected-option-3-in-chat
 
 ## Context
 
-The first project validator must parse the existing Task Graph, configuration, and Approval Record without adding a package dependency. The chosen validation runtime must not leak into the durable project contract because it can be replaced independently.
+The first planning revision validator must parse the existing Task Graph, configuration, and Approval Record without adding a package dependency. The chosen validation runtime must not leak into the durable project contract because it can be replaced independently.
 
 ## Decision
 
-Keep the machine records in YAML and bind project validation to a Runtime whose standard library provides safe YAML parsing and SHA-256 hashing.
+Keep the machine records in YAML and bind Planning Revision Validation to a Runtime whose standard library provides safe YAML parsing and SHA-256 hashing.
 
-The abstract behavior is defined by the [Project Validation Capability](../docs/20-capability-contracts/project-validation.md). The current concrete binding is recorded only in the [Runtime Mapping](../docs/10-runtime-mapping.md).
+The abstract behavior is defined by the [Planning Revision Validation Capability](../docs/20-capability-contracts/planning-revision-validation.md). The current concrete binding is recorded only in the [Runtime Mapping](../docs/10-runtime-mapping.md).
 
 ## Considered options
 
@@ -33,6 +33,6 @@ This is the selected option. It preserves the approved records and adds no packa
 ## Consequences
 
 - Existing YAML files and approval hashes remain valid.
-- The validator requires the capability named in the Runtime Mapping.
-- A Host without that capability needs a compatible validator binding, not a change to project artifacts.
+- The planning revision validator requires the capability named in the Runtime Mapping.
+- A Host without that capability needs a compatible planning revision validator binding, not a change to project artifacts.
 - YAML is parsed safely with aliases disabled.

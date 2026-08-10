@@ -9,7 +9,7 @@ planning_revision:
 
 # Project Contract Verification
 
-The current approved project passes the [Project Validation Capability](../docs/20-capability-contracts/project-validation.md) using the binding in the [Runtime Mapping](../docs/10-runtime-mapping.md).
+The current approved project passes the [Planning Revision Validation Capability](../docs/20-capability-contracts/planning-revision-validation.md) using the binding in the [Runtime Mapping](../docs/10-runtime-mapping.md).
 
 ## Checks
 
@@ -22,11 +22,13 @@ The current approved project passes the [Project Validation Capability](../docs/
 | Local Markdown links | All resolved |
 | Whitespace and em dash check | Passed |
 
+The two `validate_project` commands above record the names used when this evidence was captured. The current entry points are linked under Artifacts.
+
 The tests cover an approved fixture, unresolved questions, duplicate and unknown dependencies, self-dependency and multi-task cycles, missing verification, missing or pending approval, both planning-file hash mismatches, and a configured path escaping the project root.
 
 ## Artifacts
 
-- [Validator](../scripts/validate_project.rb)
-- [Tests](../test/validate_project_test.rb)
+- [Current planning revision validator](../scripts/validate_planning_revision.rb)
+- [Current tests](../test/validate_planning_revision_test.rb)
 - [Project template](../templates/project)
 - [ADR 0002](../adr/0002-keep-yaml-project-records.md)

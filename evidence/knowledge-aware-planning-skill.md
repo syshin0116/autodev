@@ -33,3 +33,5 @@ The Agent then produced the captured [Project Overview](../test/fixtures/plannin
 - `ruby scripts/validate_project.rb test/fixtures/planning-skill/project`
 - `ruby -Itest test/planning_skill_test.rb`
 - Agent Skills format validation with `quick_validate.py`
+
+The first command records the entry-point name used when this evidence was captured. The current binding is in the [Runtime Mapping](../docs/10-runtime-mapping.md).

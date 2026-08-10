@@ -8,12 +8,12 @@ require "pathname"
 require "tmpdir"
 require "yaml"
 
-require_relative "../scripts/validate_project"
+require_relative "../scripts/validate_planning_revision"
 
-class ValidateProjectTest < Minitest::Test
+class ValidatePlanningRevisionTest < Minitest::Test
   def test_valid_approved_project
     with_project do |root|
-      assert_empty Autodev::ProjectValidation.validate(root)
+      assert_empty Autodev::PlanningRevisionValidation.validate(root)
     end
   end
 
@@ -50,7 +50,7 @@ class ValidateProjectTest < Minitest::Test
     cases.each do |name, expected, mutation|
       with_project do |root|
         mutation.call(root)
-        errors = Autodev::ProjectValidation.validate(root)
+        errors = Autodev::PlanningRevisionValidation.validate(root)
         assert errors.any? { |error| error.include?(expected) }, "#{name}: #{errors.inspect}"
       end
     end
@@ -78,7 +78,7 @@ class ValidateProjectTest < Minitest::Test
     cases.each do |name, expected, mutation|
       with_project do |root|
         mutation.call(root)
-        errors = Autodev::ProjectValidation.validate(root)
+        errors = Autodev::PlanningRevisionValidation.validate(root)
         assert errors.any? { |error| error.include?(expected) }, "#{name}: #{errors.inspect}"
       end
     end
@@ -91,7 +91,7 @@ class ValidateProjectTest < Minitest::Test
       config["project_overview"] = "../project-overview.md"
       write_yaml(config_path, config)
 
-      errors = Autodev::ProjectValidation.validate(root)
+      errors = Autodev::PlanningRevisionValidation.validate(root)
       assert errors.any? { |error| error.include?("escapes the project root") }, errors.inspect
     end
   end
