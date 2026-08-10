@@ -64,13 +64,14 @@ Any later byte change invalidates the recorded approval. Return the approval rec
 ## Execute one approved task
 
 1. Run Project Validation immediately before any task work. On failure, stop without creating an output, evidence record, or learning candidate.
-2. Read the current approval `files` mapping. Scan Markdown files under `evidence/` instead of deriving a path from an unchecked task ID. A dependency is complete only when one record names that task, has `status: verified`, and repeats the current approval mapping as `planning_revision`. Treat evidence for another planning revision as stale. Do not treat that task as ready or rerun it automatically; stop and report the conflict when it would otherwise be selected.
-3. A task is ready when it has no current or stale verified evidence and every dependency does. If the user requested a task, run only that task when ready; otherwise stop and report its state. Only when no task was requested, use the first ready task in Task Graph order.
-4. Let the Agent Host choose tactics from the task outcome, planning references, and verification checks. Approval of the plan does not bypass normal permission or safety boundaries for destructive, sensitive, costly, or external actions.
-5. If execution exposes a material change to the goal, scope, dependencies, or verification, stop and return approval to pending before revising the plan.
-6. Run every task verification check, then run Project Validation again. Write evidence only when both pass. Never change the approved Overview or Task Graph to record progress.
+2. Read the current approval `files` mapping. Scan Markdown files under `evidence/` instead of deriving a path from an unchecked task ID. A task or dependency is complete when one record names it, has `status: verified`, and repeats the current approval mapping as `planning_revision`. Only when no current record exists, treat verified evidence for another planning revision as stale and exclude that task from automatic selection.
+3. A task is ready when it has no current or stale verified evidence and every dependency does. If the user requested a task, run only that task when ready, handle it under step 4 when stale, or stop and report any other state. Only when no task was requested, use the first ready task in Task Graph order.
+4. If the user explicitly requests a stale task, first require every dependency to be complete for the current revision. Then show the revision conflict and ask whether to reverify or rerun unless the request already says which. For reverify, skip task work and continue with the current checks in step 7. Rerun only after an explicit request and normal permission checks.
+5. Let the Agent Host choose tactics from the task outcome, planning references, and verification checks. Approval of the plan does not bypass normal permission or safety boundaries for destructive, sensitive, costly, or external actions.
+6. If execution exposes a material change to the goal, scope, dependencies, or verification, stop and return approval to pending before revising the plan.
+7. Run every task verification check, then run Project Validation again. Write evidence only when both pass. Never change the approved Overview or Task Graph to record progress.
 
-Resolve the project root, `evidence/`, and the chosen record path canonically. Stop unless the directory and record remain inside the project root and the record remains inside `evidence/`. Create one non-overwriting Markdown record there with a filesystem-safe filename chosen independently of the task ID. Include:
+Canonicalize the project root and the nearest existing parent of `evidence/`; stop unless that parent equals or is contained by the project root. Create `evidence/` only after this check, then canonicalize it and require it to remain under the project root. Choose a safe `.md` basename without path separators, independently of the task ID, and create it exclusively inside `evidence/`. Include:
 
 - frontmatter `task` encoded as a YAML string, `status: verified`, `verified_at` as a quoted ISO 8601 string, and `planning_revision` copied from the Approval Record
 - `Result`, `Checks`, and `Artifacts` sections
@@ -86,7 +87,7 @@ Before proposing, search the selected knowledge roots and candidate inbox with c
 
 `learning_candidate_inbox` may identify an external Markdown directory, resolved by the same rule as `knowledge_roots`. If a novel candidate exists and no inbox is selected, ask for one or permission to skip without invalidating task completion. A tracked path is not write authorization: confirm its canonical path and that the user selected the exact inbox for this run, unless the Agent Host already exposes it as an authorized writable workspace. Treat a sensitive local path as session-only unless the user asks to persist it. Never write to a read-only knowledge root or overwrite an existing candidate.
 
-Before writing, resolve the candidate path canonically and stop unless it remains inside the exact authorized inbox. Use a filesystem-safe filename independent of project content and never overwrite an existing file.
+Before writing, require the authorized inbox to exist and canonicalize it. Choose a safe `.md` basename without path separators, independently of project content, and create it exclusively inside that exact directory.
 
 Write each novel candidate with `status: pending`, `proposed_at` as a quoted ISO 8601 string, and `project` and `task` encoded as YAML strings, followed by `Learning`, `Context`, `Applies when`, and `Evidence` sections. Link to evidence relatively only when that relationship is stable. Otherwise identify a non-sensitive repository or selected root and the project-relative evidence path. Remove secrets and private absolute paths. A candidate remains unaccepted until explicit review.
 

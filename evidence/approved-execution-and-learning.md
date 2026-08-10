@@ -17,6 +17,8 @@ The altered project stopped at Project Validation with `approved planning file c
 
 Two additional fresh runs covered the review regressions. A requested dependency-blocked task stopped instead of falling back to another ready task. A task with evidence from an older approved revision reported the conflict instead of rerunning. Neither run changed a file.
 
+A final pair covered recovery and first-write paths. Initial execution created a missing `evidence/` directory, a new evidence file, and a candidate inside its existing authorized inbox. An explicit stale-task reverify ran only the current checks and wrote new revision evidence without changing the output or prior evidence. A later request treated that current record as complete and ignored the older stale record.
+
 Minitest validates the captured artifact contract and Project Validation. The fresh Agent runs, not Minitest, provide the observed execution behavior.
 
 ## Checks
