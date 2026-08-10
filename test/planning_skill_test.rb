@@ -5,7 +5,7 @@ require "minitest/autorun"
 require "pathname"
 require "yaml"
 
-require_relative "../scripts/validate_project"
+require_relative "../scripts/validate_planning_revision"
 
 class PlanningSkillTest < Minitest::Test
   FIXTURE = Pathname.new(__dir__).join("fixtures/planning-skill").expand_path
@@ -17,7 +17,7 @@ class PlanningSkillTest < Minitest::Test
     task_graph = YAML.safe_load(project.join("tasks.yaml").read, aliases: false)
     tasks = task_graph.fetch("tasks")
 
-    assert_empty Autodev::ProjectValidation.validate(project)
+    assert_empty Autodev::PlanningRevisionValidation.validate(project)
     assert_equal "autodev-rebuild", task_graph.fetch("project")
     assert_includes overview, "](../../knowledge/previous-autodev-retrospective.md)"
     assert_includes overview, "evidence, not authority"
@@ -33,7 +33,7 @@ class PlanningSkillTest < Minitest::Test
     expected_entries = source_rows.map { |row| "- #{row.fields.join(' | ')}" }
     expected_output = (["# Volunteer check-in", ""] + expected_entries).join("\n") + "\n"
 
-    assert_empty Autodev::ProjectValidation.validate(project)
+    assert_empty Autodev::PlanningRevisionValidation.validate(project)
     assert_equal expected_output, project.join("output/check-in.md").read
     assert_equal "build-check-in-sheet", evidence_metadata.fetch("task")
     assert_equal "verified", evidence_metadata.fetch("status")

@@ -1,8 +1,8 @@
 project: autodev
 status: approved
 approved_by: user
-approved_at: "2026-08-09"
-source: chat, explicit approval of first-version revision and ADR 0001
+approved_at: "2026-08-10T18:29:28+09:00"
+source: chat, explicit approval of GitHub Issues migration and CI knowledge revision
 files:
-  docs/project-overview.md: d6581f19053aa0042560006373a80165df5b115540477aae52c635c9ed2d1994
-  tasks.yaml: d7cc1075a13bb7961aa901601f166da1f15fb3154c2ecc8d29260f642fd14620
+  docs/project-overview.md: edb524e8119b5d5a797a8b85ddd3817238c196cd32d335352e77e4c9c40cca80
+  tasks.yaml: 01c5714fe91b386bc3274905372df860ebfa7c5d87fd82d4aad24fbd22fd2492

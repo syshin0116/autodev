@@ -56,20 +56,20 @@ Only after an unambiguous answer to the approval question:
 1. Do not modify either planning artifact after the user approves it.
 2. Compute SHA-256 from the approved bytes of exactly the configured Overview and Task Graph.
 3. Write `.autodev/approval.yaml` with `status: approved`, the approver, approval time, and a `files` mapping from each configured path to its digest.
-4. Run the Project Validation capability using the entry point in `docs/10-runtime-mapping.md` relative to this Skill.
+4. Run the Planning Revision Validation capability using the entry point in `docs/10-runtime-mapping.md` relative to this Skill.
 5. Stop before executing any task.
 
 Any later byte change invalidates the recorded approval. Return the approval record to pending, reopen the interview when the change is material, show the exact revision or diff, and request approval again. Never refresh approval hashes to conceal a changed plan.
 
 ## Execute one approved task
 
-1. Run Project Validation immediately before any task work. On failure, stop without creating an output, evidence record, or learning candidate.
+1. Run Planning Revision Validation immediately before any task work. On failure, stop without creating an output, evidence record, or learning candidate.
 2. Read the current approval `files` mapping. Scan Markdown files under `evidence/` instead of deriving a path from an unchecked task ID. A task or dependency is complete when one record names it, has `status: verified`, and repeats the current approval mapping as `planning_revision`. Only when no current record exists, treat verified evidence for another planning revision as stale and exclude that task from automatic selection.
 3. A task is ready when it has no current or stale verified evidence and every dependency does. If the user requested a task, run only that task when ready, handle it under step 4 when stale, or stop and report any other state. Only when no task was requested, use the first ready task in Task Graph order.
 4. If the user explicitly requests a stale task, first require every dependency to be complete for the current revision. Then show the revision conflict and ask whether to reverify or rerun unless the request already says which. For reverify, skip task work and continue with the current checks in step 7. Rerun only after an explicit request and normal permission checks.
 5. Let the Agent Host choose tactics from the task outcome, planning references, and verification checks. Approval of the plan does not bypass normal permission or safety boundaries for destructive, sensitive, costly, or external actions.
 6. If execution exposes a material change to the goal, scope, dependencies, or verification, stop and return approval to pending before revising the plan.
-7. Run every task verification check, then run Project Validation again. Write evidence only when both pass. Never change the approved Overview or Task Graph to record progress.
+7. Run every task verification check, then run Planning Revision Validation again. Write evidence only when both pass. Never change the approved Overview or Task Graph to record progress.
 
 Canonicalize the project root and the nearest existing parent of `evidence/`; stop unless that parent equals or is contained by the project root. Create `evidence/` only after this check, then canonicalize it and require it to remain under the project root. Choose a safe `.md` basename without path separators, independently of the task ID, and create it exclusively inside `evidence/`. Include:
 

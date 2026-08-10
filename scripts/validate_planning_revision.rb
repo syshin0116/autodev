@@ -6,11 +6,11 @@ require "tsort"
 require "yaml"
 
 module Autodev
-  module ProjectValidation
+  module PlanningRevisionValidation
     CONFIG_PATH = ".autodev/config.yaml"
     APPROVAL_PATH = ".autodev/approval.yaml"
 
-    class InvalidProject < StandardError; end
+    class InvalidPlanningRevision < StandardError; end
 
     module_function
 
@@ -32,7 +32,7 @@ module Autodev
         tasks_relative => tasks_path
       })
       []
-    rescue InvalidProject => error
+    rescue InvalidPlanningRevision => error
       [error.message]
     end
 
@@ -163,15 +163,15 @@ module Autodev
     end
 
     def invalid!(message)
-      raise InvalidProject, message
+      raise InvalidPlanningRevision, message
     end
   end
 end
 
 if $PROGRAM_NAME == __FILE__
-  errors = Autodev::ProjectValidation.validate(ARGV.fetch(0, "."))
+  errors = Autodev::PlanningRevisionValidation.validate(ARGV.fetch(0, "."))
   if errors.empty?
-    puts "Project contract valid."
+    puts "Planning revision valid."
     exit 0
   end
 
