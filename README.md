@@ -16,6 +16,8 @@ This repository contains the design record and the thin portable implementation.
 - [Planning Skill verification](evidence/knowledge-aware-planning-skill.md)
 - [Execution and learning verification](evidence/approved-execution-and-learning.md)
 
-`.autodev/` contains machine-readable configuration and approval state. When approved, `.autodev/approval.yaml` binds the exact planning revision; changing either planning artifact invalidates it.
+`.autodev/` contains machine-readable configuration and approval state. When approved, `.autodev/approval.yaml` binds the exact Overview and task-source revision; changing approval-bound content invalidates it.
+
+Validate an approved revision with `cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- <project-root>`.
 
 Install this repository through an Agent Skills compatible Host, then invoke `autodev` with a rough idea. The Skill reaches a content-bound approval, then a later execution request runs one ready task, records verification evidence, and proposes only novel, sourced learning candidates to an authorized inbox.

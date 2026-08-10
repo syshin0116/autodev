@@ -2,40 +2,99 @@
 
 ## Purpose
 
-Prevent execution against an unresolved or unapproved planning revision.
+Block execution when the configured Project Overview or Task Graph is unresolved, structurally invalid, unreadable, or different from the approved revision.
+
+It does not judge plan quality, execution readiness, permissions, or task evidence.
 
 ## Inputs
 
 - A project root
-- Machine configuration that locates the Project Overview and Task Graph
-- YAML planning and approval records
+- `.autodev/config.yaml`
+- The configured Project Overview
+- Exactly one task source
+- `.autodev/approval.yaml`
 
-The configured Project Overview and Task Graph paths must be project-relative and resolve inside the project root. The Approval Record is `.autodev/approval.yaml`.
+The Overview and local planning references must resolve inside the project root.
+
+### Local task source
+
+The existing `task_graph: tasks.yaml` form remains supported. The explicit equivalent is:
+
+```yaml
+task_source:
+  type: local_file
+  path: tasks.yaml
+```
+
+Local approval uses the existing `files` mapping and binds the exact Overview and Task Graph bytes.
+
+### GitHub Issues task source
+
+```yaml
+task_source:
+  type: github_issues
+  repository: OWNER/REPO
+  root_issue: 123
+```
+
+The root issue is a non-executable container. Its recursive sub-issues are tasks. Native blocking relationships are dependencies.
+
+GitHub approval records the Overview digest and the deterministic Issue Graph projection digest:
+
+```yaml
+planning_revision:
+  project_overview:
+    path: docs/project-overview.md
+    sha256: <digest>
+  task_source:
+    type: github_issues
+    repository: OWNER/REPO
+    root_issue: 123
+    sha256: <projection-digest>
+```
 
 ## Valid planning revision
 
-A planning revision is valid when all of the following hold:
+Every source requires:
 
-- Its `Open questions` section begins with `None` after comments and whitespace are removed.
-- The Task Graph contains at least one task.
-- Task IDs are non-empty and unique.
-- Dependencies name existing tasks and contain no cycle.
-- Every task has a title, at least one planning reference, and at least one non-empty verification check.
-- Referenced planning files exist inside the project root.
-- The Approval Record is approved, identifies the approver and time, and covers exactly the configured Overview and Task Graph.
-- Each recorded SHA-256 digest matches the current file bytes.
+- `Open questions` begins with `None` after comments and whitespace are removed.
+- The Approval Record is approved and identifies the approver and time.
+- Every task has a title, local planning reference, outcome, and verification check.
+- Dependencies name tasks in the same graph and contain no cycle.
+- The current source matches the recorded approval digest.
 
-The Approval Record is the sole approval authority. Approval does not mutate either planning artifact after review.
+A local Task Graph also requires non-empty unique task IDs and valid project-relative references.
 
-The `Open questions` check validates the declared planning state. Deciding whether an omitted question was material remains part of the interview and human review.
+A GitHub Issue Graph also requires:
+
+- complete paginated reads of the root, recursive sub-issues, and both dependency directions
+- stable issue identity, hierarchy, sibling order, title, and raw body in the projection
+- `Outcome`, `Planning references`, and `Verification` body sections with plain bullets
+- every task and dependency endpoint in the configured repository and root membership
+- no pull request in task membership or dependency endpoints
+
+The GitHub projection excludes state, labels, assignees, and comments. Those fields may change without changing approval and never satisfy verification.
+
+## Commands
+
+Validate the current approved revision:
+
+```sh
+cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- <project-root>
+```
+
+Print the current GitHub planning projection and SHA-256 before approval:
+
+```sh
+cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- --print-task-projection <project-root>
+```
+
+Validate approval and print the exact GitHub snapshot to use for execution:
+
+```sh
+cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- --print-validated-task-projection <project-root>
+```
 
 ## Result
 
-The capability returns success only when every check passes. Failure reports deterministic errors and blocks execution without modifying project files.
-
-## Exclusions
-
-- Judging whether the plan is good
-- Selecting implementation tactics
-- Updating approval after a file changes
-- Validating execution evidence
+Success means only that the declared plan is closed, structurally valid, readable, and identical to the approval record. GitHub execution uses the projection returned by that validation call, not a second read. Any incomplete GitHub read, API error, malformed response, or digest mismatch fails closed without modifying project files.

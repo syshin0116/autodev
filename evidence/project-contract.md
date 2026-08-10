@@ -28,7 +28,7 @@ The tests cover an approved fixture, unresolved questions, duplicate and unknown
 
 ## Artifacts
 
-- [Current planning revision validator](../scripts/validate_planning_revision.rb)
-- [Current tests](../test/validate_planning_revision_test.rb)
+- [Current planning revision validator](../src/lib.rs)
+- [Current tests](../tests/planning_revision.rs)
 - [Project template](../templates/project)
 - [ADR 0002](../adr/0002-keep-yaml-project-records.md)

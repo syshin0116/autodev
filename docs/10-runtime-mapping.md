@@ -4,4 +4,4 @@ Concrete bindings live here so the design contract remains stable when a binding
 
 | Capability | Current binding | Entry point | Evidence |
 | --- | --- | --- | --- |
-| [Planning Revision Validation](20-capability-contracts/planning-revision-validation.md) | Ruby standard library YAML and SHA-256 support, checked with Ruby 2.6.10 | `scripts/validate_planning_revision.rb` | `test/validate_planning_revision_test.rb` |
+| [Planning Revision Validation](20-capability-contracts/planning-revision-validation.md) | Rust 1.85+ with locked crates; `gh api` for a configured GitHub source | `cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml --`; projection modes are in the capability contract | `tests/planning_revision.rs` |
