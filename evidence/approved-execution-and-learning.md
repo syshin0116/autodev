@@ -36,4 +36,4 @@ Minitest validates the captured artifact contract and Planning Revision Validati
 
 - [Autodev Skill](../SKILL.md)
 - [Execution fixture](../test/fixtures/execution-learning)
-- [Regression test](../test/planning_skill_test.rb)
+- [Current regression test](../tests/planning_revision.rs)

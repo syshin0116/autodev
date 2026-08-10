@@ -1,7 +1,8 @@
 ---
-status: accepted
+status: superseded
 date: 2026-08-09
 approval: user-selected-option-3-in-chat
+superseded_by: 0005-bind-planning-validation-to-rust.md
 ---
 
 # ADR 0002: Keep project machine records in YAML

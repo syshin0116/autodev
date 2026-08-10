@@ -1,6 +1,7 @@
 ---
 status: accepted
 date: 2026-08-10
+runtime_example_superseded_by: 0005-bind-planning-validation-to-rust.md
 ---
 
 # ADR 0003: Keep CI templates in user knowledge
@@ -36,7 +37,7 @@ For GitHub Actions templates:
 - use Dependabot for GitHub Actions references when ongoing update pull requests are wanted
 - derive a baseline CI task after the stack and clean-checkout verification commands are known, before independent feature tasks become ready
 
-The first template is a copyable Ruby standard-library validation workflow proven by this repository. It is evidence for a pattern, not a universal default.
+The first stack-specific template is deferred to the approved reusable CI task. ADR 0005 retired the original Ruby example before publication.
 
 ## Considered options
 
@@ -70,5 +71,3 @@ This is the selected option. It preserves user ownership, lets each project dive
 - [GitHub: Reusing workflows](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows)
 - [GitHub: Secure use reference](https://docs.github.com/en/actions/reference/security/secure-use)
 - [GitHub: Keeping Actions up to date with Dependabot](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/auto-update-actions)
-- [GitHub: Building and testing Ruby](https://docs.github.com/en/actions/tutorials/build-and-test-code/ruby)
-- [ruby/setup-ruby](https://github.com/ruby/setup-ruby)
