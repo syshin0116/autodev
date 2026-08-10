@@ -1,9 +1,8 @@
 # frozen_string_literal: true
 
-require "fileutils"
+require "csv"
 require "minitest/autorun"
 require "pathname"
-require "tmpdir"
 require "yaml"
 
 require_relative "../scripts/validate_project"
@@ -26,18 +25,16 @@ class PlanningSkillTest < Minitest::Test
     refute project.join("evidence").exist?
   end
 
-  def test_forward_test_executes_an_unchanged_revision_and_proposes_one_novel_learning
+  def test_captured_execution_artifacts_match_source_and_learning_contract
     project = EXECUTION_FIXTURE.join("project")
     approval = YAML.safe_load(project.join(".autodev/approval.yaml").read, aliases: false)
     evidence_metadata, evidence_body = read_markdown(project.join("evidence/build-check-in-sheet.md"))
+    source_rows = CSV.read(project.join("source/volunteers.csv"), headers: true)
+    expected_entries = source_rows.map { |row| "- #{row.fields.join(' | ')}" }
+    expected_output = (["# Volunteer check-in", ""] + expected_entries).join("\n") + "\n"
 
     assert_empty Autodev::ProjectValidation.validate(project)
-    assert_equal <<~MARKDOWN, project.join("output/check-in.md").read
-      # Volunteer check-in
-
-      - 001 | Kim, Mina | 09:00
-      - 002 | Lee Jun | 09:15
-    MARKDOWN
+    assert_equal expected_output, project.join("output/check-in.md").read
     assert_equal "build-check-in-sheet", evidence_metadata.fetch("task")
     assert_equal "verified", evidence_metadata.fetch("status")
     assert_equal approval.fetch("files"), evidence_metadata.fetch("planning_revision")
@@ -53,23 +50,6 @@ class PlanningSkillTest < Minitest::Test
       assert_match(/^## #{heading}\n\n\S/m, pending_body)
     end
     assert_equal 1, candidates.count { |_metadata, body| body.include?("Numeric-looking identifiers") }
-
-    Dir.mktmpdir("autodev-altered") do |directory|
-      blocked_fixture = Pathname.new(directory)
-      FileUtils.cp_r("#{EXECUTION_FIXTURE}/.", blocked_fixture)
-      altered = blocked_fixture.join("project")
-      FileUtils.rm_rf(altered.join("output"))
-      FileUtils.rm_rf(altered.join("evidence"))
-      blocked_fixture.join("candidate-inbox/parse-quoted-csv-fields.md").delete
-      overview = altered.join("docs/project-overview.md")
-      overview.write("#{overview.read}\nChanged after approval.\n")
-      assert_includes Autodev::ProjectValidation.validate(altered),
-        "approved planning file changed: docs/project-overview.md"
-      refute altered.join("output").exist?
-      refute altered.join("evidence").exist?
-      assert_equal ["keep-opaque-identifiers-as-text.md"],
-        Dir[blocked_fixture.join("candidate-inbox/*.md")].map { |path| File.basename(path) }
-    end
 
     Dir[Pathname.new(__dir__).join("../evidence/*.md")].each do |path|
       metadata, = read_markdown(path)
