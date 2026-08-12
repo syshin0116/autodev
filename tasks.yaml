@@ -1,28 +1,53 @@
 project: autodev
-status: approved
+status: proposed
 source: docs/project-overview.md
 tasks:
-  - id: github-issues-task-source
-    title: Move this project's Task Graph to GitHub Issues
+  - id: host-discoverable-reentry
+    title: Rediscover Autodev in later Agent Host sessions
+    depends_on: []
+    references:
+      - docs/project-overview.md#flow
+      - docs/project-overview.md#decisions
+      - docs/research/reference-workflows.md#host-discovery-and-project-reentry
+    outcome: >-
+      After one setup, a fresh supported Agent Host can recognize an Autodev
+      planning or execution request from ordinary language, recover durable
+      project state, and continue without the user remembering the Skill name.
+    verify:
+      - Codex and Claude Code setup preserves existing Host instruction content, adds one managed routing block and one native import when needed, and is byte-idempotent when repeated.
+      - A Host without AGENTS.md or CLAUDE.md discovery can use an equivalent repository-scoped native Skill or instruction location without changing the Autodev state contract.
+      - The routing block contains no copied task, tool, approval, or evidence state and does not require a hook or daemon.
+      - Fresh Codex and Claude Code sessions route substantial project start, pending-plan continuation, approval, and next-planned-task requests without the user naming Autodev.
+      - A fresh session with a completed plan reports completion without inventing another task or revision.
+      - An isolated maintenance request in an Autodev project and an ordinary request in a non-Autodev project do not invoke Autodev.
+      - When the Skill is unavailable, a planning or execution request explains the missing capability and leaves planning, approval, and evidence unchanged.
+
+  - id: project-tool-registration
+    title: Register project tools without duplicating capability metadata
     depends_on: []
     references:
       - docs/project-overview.md#decisions
-      - adr/0001-thin-first-version.md
-      - adr/0004-use-github-issues-for-project-tasks.md
+      - docs/research/reference-workflows.md#useful-precedents
     outcome: >-
-      Autodev can use one configured GitHub root issue and its recursive
-      sub-issues as this project's sole Task System of Record while preserving
-      content-bound approval and separate execution evidence.
+      During planning, Autodev can register a successfully checked project tool
+      with only its name, project-specific purpose, and selected interface,
+      and Planning Revision Validation binds that registration without copying
+      general capability metadata or machine-specific state.
     verify:
-      - A paginated fixture preserves issue identity, hierarchy, order, native dependencies, planning references, outcomes, and verification checks.
-      - Changing a task planning field, membership, order, or dependency after approval blocks execution.
-      - Changing only issue state, labels, assignees, or comments does not invalidate approval or satisfy task verification.
-      - A missing, partial, unreadable, cross-repository, pull-request-containing, or externally dependent graph fails closed before output or evidence is written.
-      - A fixture cutover proves the local Task Graph can be retired without leaving a second writable task source.
+      - Successful CLI and MCP registration cases write only the tool name, purpose, and interface to project configuration and approval.
+      - A Host-supported interface beyond CLI and MCP can be registered without changing the configuration schema.
+      - Missing interfaces, interface mismatches, and failed required authentication leave project configuration and approval unchanged.
+      - Registration does not install or authenticate a tool; after an explicit user request, it uses the Host's existing setup mechanism and repeats the check.
+      - A directly callable CLI or MCP tool can be registered without a matching Skill.
+      - Adding, removing, renaming, or changing the purpose or interface of a registered tool fails validation until the new mapping is approved.
+      - Equivalent YAML ordering passes, while blank names or purposes and fields for capabilities, credentials, status, or verification time are rejected.
+      - Local-file and GitHub-Issues task sources enforce the same tool-registration approval rule before any GitHub API read.
+      - Two tools with overlapping general capabilities can coexist when their project-specific purposes are distinct.
+      - Existing projects without a tools mapping continue to validate.
 
   - id: reusable-ci-knowledge-template
     title: Reuse current CI knowledge safely
-    depends_on: [github-issues-task-source]
+    depends_on: [project-tool-registration]
     references:
       - docs/project-overview.md#decisions
       - adr/0003-keep-ci-templates-in-user-knowledge.md
@@ -34,11 +59,12 @@ tasks:
       - A stale CI fixture contributes applicable guidance without carrying incompatible commands or action versions into the approved plan.
       - The first template records creation, meaningful update, verification, staleness, and official sources beside its linked assets.
       - Generated GitHub Actions CI uses least privilege, full commit SHA pins, project-owned checks, and an update path for remote actions.
+      - When a project publishes an installable artifact, CI builds it, installs it in a clean environment, and exercises a public entry point.
       - Applying or improving a template does not modify the selected read-only Knowledge Root.
 
   - id: portability-check
     title: Validate portability and non-software use
-    depends_on: [reusable-ci-knowledge-template]
+    depends_on: [host-discoverable-reentry, reusable-ci-knowledge-template]
     references:
       - docs/project-overview.md#users
       - docs/project-overview.md#success-criteria

@@ -1,8 +1,4 @@
 project: autodev
-status: approved
-approved_by: user
-approved_at: "2026-08-10T18:29:28+09:00"
-source: chat, explicit approval of GitHub Issues migration and CI knowledge revision
-files:
-  docs/project-overview.md: edb524e8119b5d5a797a8b85ddd3817238c196cd32d335352e77e4c9c40cca80
-  tasks.yaml: 01c5714fe91b386bc3274905372df860ebfa7c5d87fd82d4aad24fbd22fd2492
+status: pending
+source: proposed project reentry and tool registration revision, 2026-08-12
+files: {}

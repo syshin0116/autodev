@@ -21,3 +21,5 @@ This repository contains the design record and the thin portable implementation.
 Validate an approved revision with `cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- <project-root>`.
 
 Install this repository through an Agent Skills compatible Host, then invoke `autodev` with a rough idea. The Skill reaches a content-bound approval, then a later execution request runs one ready task, records verification evidence, and proposes only novel, sourced learning candidates to an authorized inbox.
+
+Autodev itself is installed once per Host. On first use in a project, it adds only missing project-contract files and a small Host discovery marker. It checks selected Skills, CLIs, and MCP servers before registering their project-specific purpose, but does not install or authenticate them automatically. Missing setup runs only through the Host's existing mechanism after an explicit user request.
