@@ -1,10 +1,10 @@
 # Reference Workflow Findings
 
-Created on 2026-08-09 and last reviewed on 2026-08-13. This note records precedent and failure signals. The current design decision is [ADR 0001](../../adr/0001-thin-first-version.md). The Addy Osmani review used commit [`7676817`](https://github.com/addyosmani/agent-skills/commit/7676817c12a1317454ae3898a0c5c1eacf5dd3d5), the Prime Agent review used commit [`71ca6cf`](https://github.com/PrimeIntellect-ai/prime-agent/commit/71ca6cfd1a2f7205ca0ec1baa65d10d0ed88f6e8), and pen.dev documentation was accessed on 2026-08-11.
+Created on 2026-08-09 and last reviewed on 2026-08-14. This note records precedent and failure signals. The current design decision is [ADR 0001](../../adr/0001-thin-first-version.md). The Matt Pocock review used commit [`8b78b53`](https://github.com/mattpocock/skills/commit/8b78b531ab965735c5dc74f6f7a219e1e37326df), the Addy Osmani review used commit [`7676817`](https://github.com/addyosmani/agent-skills/commit/7676817c12a1317454ae3898a0c5c1eacf5dd3d5), the Prime Agent review used commit [`71ca6cf`](https://github.com/PrimeIntellect-ai/prime-agent/commit/71ca6cfd1a2f7205ca0ec1baa65d10d0ed88f6e8), the skills.sh CLI review used commit [`c6f69c6`](https://github.com/vercel-labs/skills/commit/c6f69c631292444cc541ac6d91e2226b0ff247da), and pen.dev documentation was accessed on 2026-08-11.
 
 ## Finding
 
-No reviewed project implements the complete autodev flow. [Matt Pocock Skills](https://github.com/mattpocock/skills) is the closest interaction precedent: `grilling` interviews along decision dependencies, `grill-with-docs` preserves selected context, and `to-tickets` asks the user to review task granularity and blocking relationships. It remains software-focused and does not supply an external personal Knowledge Root, a canonical cross-domain Project Overview, content-bound approval, or a learning-candidate lifecycle.
+No reviewed project implements the complete autodev flow. [Matt Pocock Skills](https://github.com/mattpocock/skills/tree/8b78b531ab965735c5dc74f6f7a219e1e37326df) is the closest interaction precedent. [`grilling`](https://github.com/mattpocock/skills/blob/8b78b531ab965735c5dc74f6f7a219e1e37326df/skills/productivity/grilling/SKILL.md) is the reusable interview primitive, [`grill-me`](https://github.com/mattpocock/skills/blob/8b78b531ab965735c5dc74f6f7a219e1e37326df/skills/productivity/grill-me/SKILL.md) is its explicit stateless entry point, and [`grill-with-docs`](https://github.com/mattpocock/skills/blob/8b78b531ab965735c5dc74f6f7a219e1e37326df/skills/engineering/grill-with-docs/SKILL.md) combines it with domain glossary and ADR updates. `to-tickets` then asks the user to review task granularity and blocking relationships. The suite remains software-focused and does not supply an external personal Knowledge Root, a canonical cross-domain Project Overview, content-bound approval, or a learning-candidate lifecycle.
 
 Autodev should reuse these interaction patterns, not adopt another framework or runtime.
 
@@ -12,7 +12,7 @@ Autodev should reuse these interaction patterns, not adopt another framework or 
 
 | Source | Useful part | Boundary for autodev |
 | --- | --- | --- |
-| [Matt Pocock Skills](https://github.com/mattpocock/skills) | Dependency-aware interview, material ADRs, reviewed task breakdown | Reference the interaction contract; do not copy the full skill suite |
+| [Matt Pocock Skills](https://github.com/mattpocock/skills/tree/8b78b531ab965735c5dc74f6f7a219e1e37326df) | Decision-frontier interview rounds, agent-owned fact finding, user-owned decisions, a shared-understanding gate, sparse ADRs, and reviewed tracer-bullet tasks | Keep the critical behavior inside Autodev; do not depend on cross-Skill dispatch or add its glossary, spec, and ADR chain by default |
 | [Addy Osmani Agent Skills](https://github.com/addyosmani/agent-skills) | Explicit assumptions, measurable success criteria, source-driven decisions, and structural, routing, and behavioral Skill evaluation | Keep one Autodev flow; do not import its full lifecycle, duplicate planning files, meta-router, personas, or arbitrary thresholds |
 | [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent) | Immutable core plus supplemental knowledge, reviewable propose/apply refinement, bounded continuation, and release-artifact checks | Treat it as an Agent Host precedent; do not import its daemon, IPython runtime, scheduler, agent protocol, or automatic refinement |
 | [pen.dev](https://docs.pen.dev/) | Editable `.pen` sources, headless CLI and local MCP access, and image or PDF export for visual verification | Treat Pen as an optional registered project tool, not an Autodev dependency or universal design choice |
@@ -24,15 +24,21 @@ Autodev should reuse these interaction patterns, not adopt another framework or 
 | [Link](https://github.com/gowtham0992/link) | Review-gated memory, provenance, deduplication, dismissal, supersession | Borrow candidate semantics without building a memory product |
 | [Beads](https://github.com/gastownhall/beads) | Dependency-aware tasks and a ready frontier | Borrow graph semantics; keep the first Task source as a file |
 | [Agent Skills](https://github.com/agentskills/agentskills) | Portable package and progressive loading | Keep the core self-contained and avoid Host-specific chaining |
+| [skills.sh](https://skills.sh/) and its [CLI](https://github.com/vercel-labs/skills/tree/c6f69c631292444cc541ac6d91e2226b0ff247da) | Cross-Host discovery and installation, canonical skill storage, source hashes, and digest-backed well-known artifacts | Use the catalog for candidate discovery only; inspect and pin the original source before adoption |
+| [RigorPilot Skills](https://github.com/lllllllama/rigorpilot-skills/tree/3ab505258a8b16f95f5d1bee4101adbbf3a469ea) | Separate direct evidence from inference, record source conflicts, and research only a concrete knowledge gap | Borrow evidence discipline without its research-specific orchestration and intermediate artifacts |
+| [Superpowers verification](https://github.com/obra/superpowers/tree/b36e0829c6d0140e93cfef2ca599b1b07d4a7797/skills/verification-before-completion) | Run fresh verification immediately before a completion claim | Keep the evidence principle without adopting the full mandatory workflow suite |
+| [Playwright CLI](https://github.com/microsoft/playwright-cli/tree/e2d8f311f38a4828fc44a1026481481442ed962b) | Browser evidence through snapshots, console, network, traces, and screenshots | Register it only when a project needs browser verification; never persist browser authentication state |
 | [Agentic code-review study](https://arxiv.org/abs/2607.13196v1) and [human-AI review study](https://arxiv.org/abs/2603.15911v1) | Large observational signals on review speed, follow-up, suggestion adoption, and project context | Treat them as one related research program, not independent or causal proof that more agents improve review quality |
 
 ## Repeated failure signals
 
 ### Interview state and decisions disappear
 
-Users reported excessive questioning, loss of the pending decision frontier after context compaction, and resolved decisions failing to reach implementation artifacts. See Matt Pocock Skills issues [#274](https://github.com/mattpocock/skills/issues/274), [#338](https://github.com/mattpocock/skills/issues/338), and [#341](https://github.com/mattpocock/skills/issues/341).
+The current `grilling` primitive treats the plan as a decision tree. Each round asks only the frontier whose prerequisites are settled, looks up environmental facts instead of asking the user, and leaves decisions to the user. It stops before action until the user confirms shared understanding. These are strong defaults for Autodev.
 
-Autodev should ask only while an answer can alter scope, dependencies, or verification. It may checkpoint the unresolved frontier as machine state, but the frontier is not another durable project document.
+The wrappers expose portability and persistence failures that Autodev should avoid. `grill-me` and `grill-with-docs` delegate to other Skills in one line, while the [upstream documentation](https://github.com/mattpocock/skills/blob/8b78b531ab965735c5dc74f6f7a219e1e37326df/docs/productivity/grilling.md) reports that some Hosts fail to load those dependencies. Users also reported excessive questioning, loss of the pending decision frontier after context compaction, and resolved decisions failing to reach implementation artifacts. See issues [#274](https://github.com/mattpocock/skills/issues/274), [#338](https://github.com/mattpocock/skills/issues/338), and [#341](https://github.com/mattpocock/skills/issues/341).
+
+Autodev should keep the primitive self-contained and ask only while an answer can alter scope, dependencies, or verification. Resolved implementation-relevant decisions belong in the canonical Overview, and complete-artifact review plus exact-revision approval is the shared-understanding gate before execution. It may checkpoint an unresolved frontier as temporary state when a session cannot hold the interview, but that frontier is not another durable project document. A separate decision map is justified only after a real planning effort repeatedly exceeds one session.
 
 ### More documents create more drift
 
@@ -76,6 +82,14 @@ Autodev should use those native discovery paths rather than require the user to 
 
 When a project ships a package, plugin, Skill, or other installable artifact, CI should create the real artifact, install it in a clean environment, and exercise its public entry point. Add a narrow regression check after a concrete packaging or reference failure rather than growing a speculative validator.
 
+### A skill catalog is not a trust root
+
+[skills.sh](https://skills.sh/docs) ranks skills from CLI installation telemetry. The count measures distribution, not correctness, maintained provenance, or project fit. Its security results are advisory and a missing, timed-out, or critical result does not block the [CLI installation path](https://github.com/vercel-labs/skills/blob/c6f69c631292444cc541ac6d91e2226b0ff247da/src/add.ts). Independent research has also demonstrated [scanner bypasses](https://blog.trailofbits.com/2026/06/03/the-sorry-state-of-skill-distribution/) and [source or dependency takeovers](https://www.air.security/blog-posts/skilljacking) that preserve a listing's accumulated reputation.
+
+The project `skills-lock.json` records a source, optional ref, path, and computed content hash, but restoration fetches the source again and does not require the restored bytes to match the prior hash. The CLI also passes a ref to `git clone --branch`, so an arbitrary commit SHA is not an installable ref. A branch or movable tag is therefore not a reproducible approval boundary. At the 2026-08-13 review, npm release `1.5.22` also predated [a privacy fix](https://github.com/vercel-labs/skills/commit/941a7bc) that moves public security-audit calls behind repository visibility checks and makes them honor telemetry opt-out.
+
+Autodev may use skills.sh to find candidates and the CLI as an optional Host installation adapter. Before adoption, inspect the complete original skill directory and referenced executable resources, then record the repository, path, exact commit, folder digest, license, and review date. Treat an update as a new reviewable diff. Do not build another registry or automatically install or update a skill from popularity, an Official label, or scanner results. The current Autodev repository is already discoverable by `npx skills add https://github.com/syshin0116/autodev --list`, so distribution does not require a custom installer.
+
 ### Faster AI review does not establish reliable approval
 
 [From Human-Centric to Agentic Code Review](https://arxiv.org/abs/2607.13196v1) studies 1.02 million reviewed pull requests from 207 public GitHub projects. Some agent-involved patterns were associated with faster decisions, but none consistently improved both efficiency and review-smell prevalence. Rapid LLM adoption was associated with more review smells and no efficiency gain. The authors describe their models as explanatory rather than causal, and review smells remain proxy measures rather than confirmed defects.
@@ -98,6 +112,7 @@ For Autodev, an AI review finding is a hypothesis to verify against the approved
 - Keep the Knowledge Root user-owned and Markdown-readable.
 - Keep general tool capabilities in their native Skill, MCP, CLI, or Host metadata. Record only the selected tool interface and project-specific purpose in project configuration.
 - Verify a tool once when registering it. Do not persist credentials or mutable installation and authentication status, and do not silently substitute a different tool after failure.
+- Use skill catalogs to discover candidates. Bind an adopted skill to its original path, exact revision, digest, license, and review date rather than its rank or audit badge.
 - Treat review findings as hypotheses that require project context and verification evidence; reviewer count or agent participation is not approval.
 - Add integrations, indexes, and notifications only in response to observed failures.
 
