@@ -86,7 +86,7 @@ Autodev revalidates the revision, executes and verifies one ready task through t
 
 | Artifact | Responsibility |
 |---|---|
-| [`SKILL.md`](SKILL.md) | Planning, approval, execution, and learning workflow |
+| [`SKILL.md`](SKILL.md) and [`references/`](references/) | Phase routing plus planning, execution, and learning workflows |
 | `docs/project-overview.md` | Canonical project intent, decisions, scope, and success criteria |
 | `tasks.yaml` or GitHub Issues | Approval-bound outcomes, dependencies, references, and checks |
 | `.autodev/config.yaml` | Project paths and selected task source |
@@ -108,7 +108,8 @@ A valid revision prints `Planning revision valid.` GitHub projection commands an
 | Document | Contents |
 |---|---|
 | [Project Overview](docs/project-overview.md) | Goal, boundaries, current decisions, and proposed work |
-| [Autodev Skill](SKILL.md) | Complete Host-facing behavior |
+| [Autodev Skill](SKILL.md) | Host-facing phase router and shared boundaries |
+| [Phase guides](references/) | Planning, execution, and learning behavior loaded when needed |
 | [Planning Revision Validation](docs/20-capability-contracts/planning-revision-validation.md) | Local and GitHub task-source validation contract |
 | [Runtime Mapping](docs/10-runtime-mapping.md) | Capability to Rust and GitHub CLI mapping |
 | [Reference Workflows](docs/research/reference-workflows.md) | Reviewed precedents, failure reports, and adopted lessons |
