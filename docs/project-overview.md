@@ -8,120 +8,192 @@ approval: pending
 
 ## Background
 
-Agent Hosts can execute work, but a conversation rarely preserves the user's prior decisions, the reasoning behind them, or the exact plan they approved. Existing specification workflows cover parts of this path, yet commonly add overlapping documents, their own runtime, or software-only assumptions. The [reference review](research/reference-workflows.md) records the evidence behind this assessment.
+The first Autodev milestone proved knowledge-aware planning, exact-revision approval, task execution through an Agent Host, and separate verification evidence. It still depends on the user returning to a chat and asking for each task. It does not operate a pull request, react to CI and review feedback, or judge accumulated outcomes against existing knowledge.
+
+The intended product is a continuing project improvement loop. A user should be able to authorize a well-defined issue and return when Autodev has either prepared a reviewed pull request or found a decision that requires the user.
 
 ## Goal
 
-Turn an opportunity or rough idea into a concise, decision-complete Project Overview through knowledge-aware interviewing. Derive a verifiable Task Graph, obtain approval bound to those exact planning artifacts, then let the existing Agent Host execute and return evidence-backed learning candidates.
+Turn approved project intent and authorized tasks into verified pull requests, ask only when a material decision or permission is missing, and feed evidence-backed insights into a reviewable Knowledge judgment loop.
 
 ## Users
 
-People using an Agent Skills compatible Agent Host who want to apply their own private, reusable knowledge to software and non-software projects.
+People using an Agent Skills compatible Agent Host who want knowledge-aware planning for any project and autonomous improvement for repository-based work, while retaining control over intent, repository writes, and reusable knowledge.
 
 ## Inputs
 
-- Free-form conversation
-- Supplied opportunities, source files, and links
-- User-owned Markdown knowledge roots outside autodev
-- Current official sources for mutable technical decisions
-- Project tools selected during planning
+- A canonical Project Overview and project delegation policy
+- Authorized issues with outcomes, planning references, dependencies, and checks
+- User-owned Markdown Knowledge Roots
+- Current project code, CI, review feedback, and official external sources
+- Approved engine policy, project-selected Agent engine, and tools
 
 ## Deliverables
 
-- One canonical Project Overview
-- An approved Task Graph with dependencies and completion checks in the selected Task System of Record
-- Approval-bound project tool registrations when the plan requires them
-- Execution artifacts and verification evidence
-- Reviewable learning candidates
+- Approval-bound project intent and task snapshots
+- Draft pull requests with project-owned verification results
+- Durable question, retry, and review state in GitHub
+- Raw execution evidence, including failed and rejected approaches
+- Pending insight and Knowledge challenge candidates with provenance
 
 ## Flow
 
 ```text
-first use: install Autodev once in the Host -> project marker and contract -> knowledge lookup + current research -> interview -> register selected tools -> overview -> tasks -> approve
-later session: ordinary request -> project marker or implicit Skill match -> recover current state -> continue planning or execute -> verify -> propose learnings
-```
+Planning
+rough idea -> knowledge and current-source research -> focused interview
+           -> Project Overview -> task issue -> authorization
 
-The first milestone ends at the approved handoff. Execution and learning reuse the Agent Host instead of introducing an autodev runtime.
+Delivery
+authorized issue -> validate and claim -> implement -> checks -> draft PR
+                 -> review and fix -> configured merge policy
+                 -> ask and stop when human judgment is required
+
+Learning
+issue + runs + PR + CI + review -> evidence -> insight candidate
+                                -> Knowledge judgment
+                                -> confirm, qualify, contradict, or supersede
+
+Challenge
+due or contradicted Knowledge -> current-source research
+                              -> challenge candidate or Knowledge PR
+```
 
 ## Decisions
 
-- Package autodev as one portable Agent Skill. The Agent Host owns execution strategy.
-- During first setup, use one concise Autodev block in the project's existing Host instruction files. Share `AGENTS.md` with Claude Code through a `CLAUDE.md` import when those native mechanisms are available. Preserve unrelated instructions and make repeated setup byte-idempotent.
-- Project setup copies only missing contract files and the routing block. It does not install or authenticate another Skill, CLI, MCP server, or service.
-- Use the project marker only to route requests that create, revise, approve, continue, or execute the Autodev plan. Do not route isolated fixes, routine maintenance, questions, reviews, or tests through Autodev unless the user asks.
-- On every reentry, recover state from the configured Overview, Task Source, Approval Record, and evidence instead of relying on chat memory. Do not copy task, tool, or approval state into Host instruction files.
-- If a project marker exists but the Autodev Skill is unavailable, stop only the Autodev planning or execution request, explain how to install or enable the Skill, and leave planning, approval, and evidence unchanged.
-- Keep user knowledge outside the distributed autodev repository in user-owned Markdown roots.
-- Let Skills, MCP servers, CLIs, and Agent Hosts describe their general capabilities. Do not copy those capability catalogs into project configuration.
-- Register a project tool in `.autodev/config.yaml` only after a harmless check confirms that its selected interface is available and, when required, authenticated. Store only the tool name, its project-specific purpose, and the selected interface.
-- When a selected tool is unavailable, leave project state unchanged and offer the Host's existing installation or authentication path. Perform that setup only after an explicit user request, then repeat the registration check.
-- Allow tools with overlapping general capabilities. Distinguish them by the purpose they serve in the current project, and leave an unresolved choice unregistered until planning resolves it.
-- Copy the registered `tools` mapping into the Approval Record and compare it semantically during Planning Revision Validation. Do not bind machine-specific knowledge paths, credentials, installation state, or authentication state.
-- Do not repeat registration checks before every task. If a registered tool later fails during use, stop and recover instead of silently substituting another tool.
-- Keep reusable implementation templates in selected Knowledge Roots as sourced Markdown records with linked assets. Copy and adapt them into projects without writing back to the root.
-- Treat graph databases and other search indexes as rebuildable views over canonical Markdown and linked assets. Preserve the source path and commit for every indexed record.
-- Record template creation, meaningful update, verification, and staleness separately. Check mutable claims against current official sources before every reuse because a prior decision is not current authority.
-- For software projects without adequate CI, derive baseline CI after the stack and clean-checkout checks are known and before independent feature tasks become ready.
-- Keep the Project Overview canonical. Add a Decision Record only when the alternatives and rationale will matter later.
-- Store user-facing project artifacts at visible, configured paths. Reserve `.autodev/` for machine-readable configuration and state.
-- Use GitHub Issues in `syshin0116/autodev` as this project's Task System of Record after an approved migration task and a separately approved cutover revision.
-- Use one configured root issue as a non-executable plan container. Its recursive sub-issues in `syshin0116/autodev` are tasks, and native blocking relationships must stay within that membership. Reject pull requests, cross-repository tasks, and external dependency endpoints.
-- Bind approval to a deterministic projection of issue identity, title, body, hierarchy, order, and dependencies. Exclude comments, assignees, labels, and open or closed state so normal execution does not invalidate approval.
-- Fail closed when the complete approved Issue Graph cannot be read. A changed planning field, membership, order, or dependency reopens approval.
-- Treat the approved Overview and Task Graph as an immutable planning revision. Store execution status and evidence separately so normal progress does not invalidate approval.
-- Bind approval to the exact planning revision. Any included projection change requires approval of the new digest; reopen the interview only when the change is material.
-- Treat approved decisions as accepted within the project only. A reusable lesson still enters the writable Knowledge Root as a candidate.
-- Propose only sourced learning candidates with context and applicability. Check accepted, pending, deferred, and dismissed records before proposing another.
-- Review new candidates in one batch at project close. A deferred candidate remains searchable and may resurface during later relevant work without blocking closure.
-- Present the minimum decision-relevant summary first, then link to Decision Records and raw evidence.
+### Product boundary
 
-These boundaries are accepted in [ADR 0001](../adr/0001-thin-first-version.md).
-The proposed CI template boundary is recorded in [ADR 0003](../adr/0003-keep-ci-templates-in-user-knowledge.md).
-The proposed task-source migration is recorded in [ADR 0004](../adr/0004-use-github-issues-for-project-tasks.md).
+- Keep one portable Autodev Skill for planning and judgment. The Skill is not a daemon or model runtime.
+- Add event-driven delivery as a replaceable adapter. The first adapter uses GitHub Agentic Workflows in GitHub Actions and Codex as its first engine. The selected engine and model version are operational state inside the approved provider, data-use, and cost policy.
+- Use GitHub Issues, pull requests, checks, comments, and labels as durable workflow state. Do not add a queue, Task database, or paused model process.
+- Keep the core vocabulary provider-neutral, but implement only GitHub before a real project requires another Task Source or delivery environment.
+- Preserve general planning and conversational execution for non-software work. The first autonomous delivery adapter applies only to repository-based work.
+
+### Delegation policy
+
+- Allow an authorized `autodev:ready` event to create or reuse a task branch, run repository checks, create or update one draft pull request, and maintain Autodev labels and comments through validated outputs.
+- Set this project's merge mode to `auto_after_gates`. A deterministic controller may perform a squash merge after every approved gate passes; the Agent cannot merge or waive a gate. Do not use GitHub native auto-merge or the experimental Agentic Workflow merge output for this milestone.
+- Deny deployment, release, secret changes, destructive operations, and unrelated repository writes in the first autonomous milestone.
+- Require a user decision for material scope or verification changes, new external cost, missing credentials, sensitive data exposure, or any action outside the approved task and this policy.
+- Allow one initial delivery and two automated correction runs per task snapshot. Stop earlier when a correction produces no new head or repeats the same normalized failure signature. Only a newly authorized task snapshot resets the budget.
+- Keep this policy inside the approval-bound Project Overview. Knowledge records may inform its wording but cannot modify or bypass it.
+
+### Authorization and task state
+
+- Define the project revision as the exact Overview bytes plus a semantic projection of Task Source repository, authorizer and cancel roles, delivery base branch, protected paths, required checks and review rules, registered tool names, purposes, interfaces and permission envelopes, Knowledge source aliases and visibility, candidate carrier identity and visibility, writable Knowledge target identity and visibility, merge mode, correction budget, and engine policy. Treat a Knowledge source without declared visibility as private. The engine policy binds allowed providers, data-use boundary, and cost class. Exclude credential values, local Knowledge paths, the selected engine and model version within that policy, installation state, and authentication state.
+- Treat public or untrusted issue creation as input only. An authorized maintainer applying `autodev:ready` approves one exact task snapshot against the current project revision.
+- Bind a task snapshot to canonical raw GitHub issue identity, title, body, dependency identities, and the project revision. Give the Agent a separate integrity-filtered projection and record both digests. A task edit invalidates only that task. Adding or changing another issue does not.
+- Record the snapshot digest, authorizing actor, authorization event identity and generation, and project revision with the workflow run and resulting pull request or evidence.
+- Configure one GitHub repository as the Task Source without requiring a root issue. A native blocking edge is valid only when both endpoints are issues in that repository.
+- Treat a dependency as complete only when its approved result has verified evidence and its pull request is merged into the dependent task's base. Dependency completion re-evaluates already authorized blocked issues.
+- Keep execution progress outside approval-bound content. Labels, pull request state, comments, checks, and evidence may change without rewriting the task.
+- Assign a monotonic authorization generation under per-issue concurrency and retain its durable authorization record. Replays of the same ready-label event reuse the generation; a new ready application after abandonment creates the next generation even when task content is unchanged.
+- Key a delivery episode by repository, issue number, task digest, and authorization generation. Duplicate runs may start, but every side effect must resolve to the same deterministic branch and pull request marker or become a no-op. Never force-push or fall back to a second pull request.
+- Allow only one active delivery episode and pull request per issue. An authorized task edit or approved project revision supersedes the active episode, invalidates its required gate, closes its unmerged pull request, and records the replacement digest before another snapshot can start. Preserve the linked episode lineage for later judgment.
+- Treat issue closure, human removal of `autodev:ready`, an authorized cancel command, or human pull request closure without merge as abandonment only when the actor has the configured cancel role. An untrusted edit or close may fail the task gate but cannot close a pull request, change labels, merge, or authorize cleanup. A workflow removal paired with the recorded `needs-input` transition suspends rather than abandons the episode. Reopening never resumes work until an authorized maintainer applies `autodev:ready` to a new snapshot.
+- Make `merged` an absorbing terminal state. A later issue close is a no-op and cannot reverse successful evidence or dependency release. A controller-closed superseded pull request retains `superseded` rather than being reclassified as abandoned.
+- Preserve event-time project and task snapshots as non-Agent inputs. Delivery writes require an exact active snapshot. A separate restrictive cleanup gate validates the old episode identity and trusted invalidating event, then permits only gate failure, terminal evidence, and, for an authorized cancel or supersession, closing the old pull request. Re-read the applicable gate inputs immediately before every write.
+- Keep Knowledge and authority separate. A preference or accepted lesson can inform a decision but cannot grant write access, merge permission, budget, or a wider action scope.
+
+Task-source cutover is a planning transition, not an executable issue. The local Task Graph carries a machine-readable transition marker after `task-scoped-authorization`; the Skill and validator must stop later task selection at that marker. After the first task is verified, create issues only for the remaining work, omit the completed local predecessor, present the complete config projection and task snapshots, and request exact approval. That approval switches configuration to GitHub Issues and removes `tasks.yaml`; no cutover issue or writable mirror remains.
+
+### Delivery and questions
+
+- Run the Agent in a constrained environment with read-only GitHub access by default. Apply repository writes through validated, least-privilege outputs.
+- Commit the human-readable Agentic Workflow source and its compiled lock workflow. Pin the compiler and actions, validate strictly, reject generated drift, and use staged output for the first live event.
+- Require project-owned checks before a pull request can become ready. Agent pull request CI has `contents: read`, receives no secrets or write token, and performs no deployment or release. A repository without this baseline CI must establish it before autonomous feature issues become ready.
+- Use a repository-scoped delivery credential with only Contents, Pull requests, and Checks read and write access. It supplies the extra commit that starts CI, publishes the task-bound gate, and performs the deterministic merge, but is never available to the Agent, pull request CI, or review-event receivers. Privileged controller jobs run only from trusted default-branch workflow definitions, read metadata, and never execute pull request code or consume its artifacts.
+- Create or update one draft pull request for an authorized task. Never create parallel pull requests for retries of the same task revision.
+- Block protected-file changes in the first milestone and end the episode as `human-needed`. Disable safe-output fallbacks that could create another issue or pull request.
+- Review each current pull request head in a fresh run. Treat review findings as hypotheses until supported by the approved task, applicable Knowledge, current code, or executable checks.
+- Automatically correct supported findings within the approved correction budget. Store attempt count, last processed head, and normalized failure signature with the delivery episode. Process only the configured event transitions; other self-generated events are no-ops.
+- Ask one focused question and end the run when user judgment is required. Persist the suspended transition first, then publish the question and `autodev:needs-input`, and remove `autodev:ready` last. Each step is idempotent. Incorporate a material answer into the issue body, then require an authorized maintainer to reapply `autodev:ready`. Resume a credential or other non-content unblock through an authorized command bound to the unchanged task digest.
+- Determine readiness from the current head SHA, CI, conflicts, every unresolved review thread, GitHub review decision, configured required approvals, and protected-file state. A thread that the integration cannot resolve moves the episode to `human-needed`. Do not use an Agent's confidence or completion claim as evidence.
+- Publish an approval-bound `autodev/gate` check for the exact current head in one trusted job. Only after that job completes may a separate trusted merge job repeat the write-time validation and call GitHub's merge API with the verified head SHA. A changed head or HTTP 409 fails closed. The repository-scoped delivery credential has no ruleset bypass. If any gate fails or repository rules do not permit the merge, leave the pull request ready for human action.
+
+The first adapter reacts only to this event matrix:
+
+| Event | Accepted use |
+| --- | --- |
+| `issues:labeled` | Start only when an allowed actor applies `autodev:ready` to an open issue. |
+| `issues:edited` | An allowed authorizer may supersede and clean up the old episode; an untrusted edit only fails its gate. |
+| `issues:unlabeled`, `issues:closed` | An allowed cancel actor may abandon and clean up the episode; an untrusted event only fails its gate. |
+| `issues:reopened` | Wait for a new ready authorization. |
+| `workflow_run:completed` | Continue only for configured CI, Agent review, gate, or unprivileged event-receiver workflows, repository, branch, and head SHA. Never execute pull request code or artifacts in the privileged controller. |
+| `pull_request_review` and `pull_request_review_comment` changes | Run a receiver with no secret or write token; a trusted default-branch `workflow_run` controller then re-reads review metadata. |
+| Authorized `issue_comment:created` command | Resume an operational unblock, or recheck review gates after a human resolves a thread, bound to the unchanged task digest and head. |
+| Trusted `repository_dispatch: autodev-recheck` | Recheck after the controller resolves a thread because GitHub emits no thread-resolved Actions event. |
+| `pull_request:closed` | Finalize a merge, supersession, or abandonment, then release dependencies only for merged verified evidence. |
+
+Configure exact `on.roles`, `tools.github.min-integrity: approved`, `approval-labels`, and `refusal-labels`. Do not use a label command that removes authorization before validation. Later runs trust the recorded authorizing actor and digest rather than label presence alone. Human label removal revokes the episode; the recorded workflow transition to `needs-input` is the only removal that preserves it in a suspended state.
+
+### Evidence, insights, and Knowledge
+
+- Record a concise durable result for every successful, failed, rejected, superseded, abandoned, and interrupted run. Include episode and attempt identity, task digest, commit and head SHA, check outcome, artifact digest, selected engine and version, and applied or rejected Knowledge revisions. If project evidence is more public than a Knowledge source, store only an opaque digest there and keep the private identifier mapping in the authorized candidate carrier. Treat expiring workflow logs and artifacts as supplemental evidence.
+- Create an insight only when evidence supports a non-obvious claim with a stated context and applicability.
+- Wait for a task outcome such as merge, explicit abandonment, or exhausted escalation before final insight judgment. Re-evaluate provisional observations against the complete linked episode lineage, including superseded attempts, questions, reviews, and rejected approaches.
+- Compare an insight with existing Knowledge and classify it as confirming, qualifying, contradicting, superseding, duplicate, or unrelated.
+- Treat pending insights as hypotheses. Accepted Knowledge may guide later work only when its applicability matches, it is not stale, its current sources remain valid, and no unresolved challenge conflicts with it.
+- Configure a candidate carrier before autonomous learning. Its visibility must be at least as restrictive as every source used for the insight. A private carrier may receive the pending candidate automatically. For a public carrier, the autonomous run stores only an opaque review-needed record; candidate content is regenerated from durable evidence in an authorized review session and written only after a human approves its sanitization and target visibility. A separately authorized Knowledge adapter may then promote it to one configured writable target. This project's dogfood target is `syshin0116/dev-knowledge`; the Agent proposing a record cannot approve its own promotion.
+- Preserve project-local decisions in the project. Promote only reusable reasoning, preferences, constraints, or lessons to the external Knowledge Root.
+- In a later milestone, scan `stale_after` deterministically on a schedule. Run Web or official-source research only for due records or direct contradictions, and propose a challenge instead of silently rewriting Knowledge.
+- Keep canonical Knowledge as human-readable Markdown. A graph database may later index relationships, but it is never the authority or the decision maker.
+
+### Configuration and portability
+
+- Store project paths, Task Source, selected engine and engine policy, authorizer and cancel roles, delivery base branch, protected paths, required checks and review rules, approved correction budget, merge mode, stable Knowledge source aliases and visibility, candidate carrier, writable Knowledge target, tool purposes, interfaces, and permission envelopes in `.autodev/config.yaml`. Keep credential values, authentication state, machine-specific Knowledge paths, and discovery outside tracked configuration.
+- Verify a required CLI, MCP server, or other interface before relying on it. Do not silently install, authenticate, or substitute a tool.
+- Let Agent Hosts and tools describe their general capabilities. Project configuration records only the choice and purpose for this project.
+- Reuse templates from selected read-only Knowledge Roots after checking applicability, provenance, and mutable guidance against current official sources.
+
+These proposed boundaries are recorded in [ADR 0006](../adr/0006-add-an-event-driven-improvement-loop.md). When accepted, ADR 0006 activates ADR 0001's runtime upgrade trigger and supersedes ADR 0004's whole-Issue-Graph approval boundary.
 
 ## Success criteria
 
-- A free-form idea or supplied opportunity can reach an Overview with no unresolved question that could change scope, dependencies, or verification.
-- In fresh Codex and Claude Code sessions, ordinary requests to start substantial project work, continue its saved plan, approve it, or run the next planned task discover Autodev without the user naming it.
-- An isolated maintenance request in an Autodev project and an ordinary request in a non-Autodev project do not trigger Autodev.
-- Repeating project setup preserves existing Host instructions and does not duplicate or change the managed marker or native import.
-- A Host without the Autodev Skill reports the missing capability without changing planning, approval, or evidence state.
-- Prior knowledge informs the interview and is cited without silently becoming binding.
-- The Overview contains only information that changes a decision, action, constraint, or verification result.
-- Every task links to the relevant Overview section or Decision Record and has a runnable or human-verifiable completion check.
-- Execution is blocked when approval is missing, the Overview changes, or the approved Issue Graph projection changes.
-- A missing selected interface, interface mismatch, or failed required authentication prevents tool registration without changing project configuration.
-- Adding, removing, renaming, or changing the purpose or interface of a registered tool invalidates approval, while reordering equivalent YAML does not.
-- Two tools with overlapping general capabilities can be registered when their project-specific purposes are distinct.
-- GitHub pagination is exhausted before validation. Pull requests, cross-repository tasks, external dependency endpoints, and unavailable or partial graph reads block execution.
-- Execution evidence can accumulate without changing the approved planning revision.
-- A completed run can produce a sourced learning candidate without promoting it automatically.
-- A matching CI template is adopted only after its applicability and mutable claims are checked against the target project and current official sources.
-- Generated baseline CI runs project-owned verification with least privilege and an explicit update path for remote dependencies.
-- The same Skill passes the approval boundary in at least two Agent Hosts without changing the core package.
-- One non-software fixture reaches approval without code-specific assumptions.
+- Applying `autodev:ready` as an authorized maintainer creates one delivery episode for the approved issue revision. Duplicate runs produce no duplicate side effect.
+- Reauthorizing an abandoned issue with unchanged content creates exactly one new authorization generation and preserves the prior terminal evidence.
+- An untrusted issue or stale edit cannot write code, close a pull request, change labels, merge, or authorize cleanup. It may only cause the exact stale task gate to fail.
+- Cancellation by an allowed actor or superseding an authorized revision stops the active episode, invalidates its gate, closes its unmerged pull request, and cannot release a dependency. An untrusted edit only fails the task gate, while a recorded workflow transition to `needs-input` suspends it.
+- Adding an unrelated issue does not invalidate or restart an approved task.
+- A blocked dependency does not run. Merged verified dependency completion re-evaluates and resumes an already authorized dependent issue.
+- A missing material decision produces one focused question and a durable `needs-input` state. A material answer changes the issue body and requires new task authorization; an operational unblock resumes only through an authorized command.
+- A ready task produces one draft pull request, runs project-owned CI, receives a fresh review, and applies supported findings within a bounded loop.
+- Duplicate delivery events, retries, and workflow restarts do not create duplicate branches, pull requests, evidence, or insight candidates.
+- Pull request readiness is calculated from the current head and repository state rather than Agent self-report.
+- With `auto_after_gates`, a deterministic controller performs a squash merge only after the current task, head, CI, every review thread, review decision, required approval, question, ruleset, and protected-file gate passes.
+- Successful and failed terminal runs can produce traceable evidence, while unsupported or obvious observations produce no insight.
+- A pending insight can be compared with Knowledge but cannot become accepted authority or expand automation permissions without external approval.
+- A promoted Knowledge record retains context, applicability, evidence, source revision, creation date, verification date, and freshness information.
+- The GitHub adapter can change Agent engine within the approved provider, data-use, and cost policy without changing the Project Overview, task snapshot, evidence, or Knowledge contracts.
 
-## Non-goals for the first version
+## Non-goals for the first autonomous milestone
 
-- Automatic opportunity discovery
-- A custom model runtime, server, chat UI, or Task database
-- A tool capability catalog, installer, authentication broker, or tool-specific runtime adapter
-- A hosted knowledge service, graph database, embedding pipeline, or custom retrieval engine
-- Task integrations beyond GitHub Issues
-- Prescribed subagent layouts, reviewer personas, or implementation tactics
-- Background reconciliation, notifications, dashboards, or trend monitoring
-- Host-specific hooks or daemons for Skill discovery or project reentry
-- Automatic promotion of reusable knowledge
-- A custom template engine or centrally hosted CI workflow before repeated use demonstrates that boundary
+- Deployment or release automation
+- Task adapters for GitLab, Linear, Jira, or other providers
+- A custom Autodev server, queue, scheduler, dashboard, or notification service
+- Continuous background model sessions
+- Automatic promotion of insight candidates or self-expansion of Agent authority
+- A hosted Knowledge service, graph database, embedding pipeline, or custom retrieval engine
+- Automatic opportunity discovery or broad trend monitoring
+- Multi-repository project task execution beyond one explicitly configured Knowledge contribution target
+- Prescribed multi-agent personas or a mandatory multi-model review gauntlet
+
+## Later milestone
+
+After the issue-to-insight loop is dogfooded, add a deterministic `stale_after` scan. Only due or directly contradicted Knowledge should trigger current-source research, and the result must be a reviewable challenge rather than an automatic rewrite.
 
 ## References
 
-- [Reference workflow findings](research/reference-workflows.md)
 - [ADR 0001: Keep the first version thin](../adr/0001-thin-first-version.md)
-- [ADR 0003: Keep CI templates in user knowledge](../adr/0003-keep-ci-templates-in-user-knowledge.md)
 - [ADR 0004: Use GitHub Issues for project tasks](../adr/0004-use-github-issues-for-project-tasks.md)
-- The [archived autodev repository](https://github.com/syshin0116/autodev-archive) is historical evidence, not an active design contract.
+- [ADR 0006: Add an event-driven improvement loop](../adr/0006-add-an-event-driven-improvement-loop.md)
+- [Reference workflow findings](research/reference-workflows.md)
+- [GitHub Agentic Workflows](https://github.github.com/gh-aw/)
+- [GitHub Agentic Workflows safe outputs](https://github.github.com/gh-aw/reference/safe-outputs/)
+- [GitHub Agentic Workflows CI triggering](https://github.github.com/gh-aw/reference/triggering-ci/)
+- [GitHub Actions events](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)
+- [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)
+- The [archived Autodev repository](https://github.com/syshin0116/autodev-archive) remains historical evidence rather than an active implementation base.
 
 ## Open questions
 
-None that can change the first-version scope or verification.
+None that changes the proposed first autonomous milestone or its verification.

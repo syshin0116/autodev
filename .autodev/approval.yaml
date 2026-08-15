@@ -1,4 +1,8 @@
 project: autodev
-status: pending
-source: proposed project reentry and tool registration revision, 2026-08-12
-files: {}
+status: approved
+approved_by: user
+approved_at: "2026-08-16T02:42:17+09:00"
+source: chat approval
+files:
+  docs/project-overview.md: 872e6ddbf353ac5d6c820003041daac6257f77be88e76b10a592e96e21285d6a
+  tasks.yaml: ef1fa0eaf797aa3356dba532b2820a6316f393b5e665ad68dab6f2d5950b2acb

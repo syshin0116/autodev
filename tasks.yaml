@@ -1,77 +1,131 @@
 project: autodev
 status: proposed
 source: docs/project-overview.md
+required_planning_transition:
+  after_task: task-scoped-authorization
+  reason: github_task_source_cutover
 tasks:
-  - id: host-discoverable-reentry
-    title: Rediscover Autodev in later Agent Host sessions
+  - id: task-scoped-authorization
+    title: Authorize one issue revision without freezing the backlog
     depends_on: []
+    references:
+      - docs/project-overview.md#authorization-and-task-state
+      - adr/0006-add-an-event-driven-improvement-loop.md
+    outcome: >-
+      Planning Revision Validation and the Autodev Skill distinguish one
+      approval-bound project revision from independently authorized issue
+      snapshots, without requiring a complete root Issue Graph.
+    verify:
+      - The project revision binds Overview bytes, Task Source repository, authorizer and cancel roles, delivery base branch, protected paths, required checks and review rules, registered tool purpose, interface and permission envelope, Knowledge source aliases and visibility, candidate carrier identity and visibility, writable Knowledge target identity and visibility, merge mode, correction budget, and engine policy; an undeclared Knowledge visibility is private.
+      - The engine policy binds allowed providers, data-use boundary, and cost class, while the selected engine and version within that policy remain operational and are recorded in evidence.
+      - The GitHub Task Source requires one repository, no root issue, and native dependency endpoints from that repository only.
+      - An exact permitted actor applying autodev:ready binds canonical raw issue identity, title, body, dependency identities, and current project revision; a separate integrity-filtered projection is used only as Agent input and both digests are retained.
+      - Editing an approved issue invalidates only that task, while adding or changing an unrelated issue leaves it valid.
+      - Changing the approved project revision blocks every task snapshot bound to the prior revision.
+      - Issue closure, human ready-label removal, an authorized cancel command, or human pull request closure without merge abandons the episode only for an allowed cancel actor; a recorded workflow needs-input transition suspends it, and reopening requires new authorization.
+      - An authorized task edit or approved project revision supersedes the active episode, invalidates its gate, and closes its unmerged pull request before a new snapshot can start; an untrusted edit only fails the exact task gate.
+      - A dependency is ready only after its approved evidence is verified and its pull request is merged into the dependent task base.
+      - Authorization is serialized per issue and records a monotonic generation; replaying one ready event reuses its generation, while a new ready application after abandonment increments it even when the task digest is unchanged.
+      - Repository, issue number, task digest, and authorization generation form the episode identity.
+      - Existing local planning revision fixtures remain valid until an explicitly approved cutover and cannot be active beside the GitHub source.
+      - Planning Revision Validation accepts the required_planning_transition marker only for a known task, and the Skill stops every later ready-task selection after that task is verified until a new planning revision is approved.
+
+  - id: github-issue-to-draft-pr
+    title: Turn one authorized issue into a verified draft pull request
+    depends_on: [task-scoped-authorization]
+    references:
+      - docs/project-overview.md#delegation-policy
+      - docs/project-overview.md#delivery-and-questions
+      - adr/0006-add-an-event-driven-improvement-loop.md
+    outcome: >-
+      A pinned GitHub Agentic Workflow runs Codex for one authorized delivery
+      episode and creates or updates one deterministic draft pull request while
+      every repository write remains separately validated.
+    verify:
+      - Before this task becomes executable, a separate planning transition creates issues only for this task and its downstream work, presents the full config projection and snapshots, receives exact approval, switches to the GitHub source, and removes tasks.yaml.
+      - The cutover config selects the authorizer and cancel roles, base branch, protected paths, required checks and review rules, engine policy, correction budget, merge mode, stable Knowledge source aliases and visibility, candidate carrier, and Knowledge target; this issue is the new graph root.
+      - One-time setup checks the engine credential and approved provider, data-use and cost policy, exact actor roles, approval and refusal labels, Task Source, base branch, required checks and review rules, baseline CI, repository-scoped delivery credential, and protected-file policy without storing credential values in project config.
+      - The base branch has a ruleset requiring up-to-date branches, project CI, autodev/gate, conversation resolution, configured approvals, restricted direct pushes, and squash merge support; the merge controller has no bypass permission.
+      - The human-readable workflow, compiled lock workflow, compiler version, and action pins are committed; strict validation and compilation drift checks pass before a staged first event.
+      - Agent pull request CI has contents read only, receives no secrets or write token, and performs no deployment or release.
+      - A repository-scoped delivery credential has only Contents, Pull requests, and Checks read and write access; it supplies the CI-trigger commit, task-bound gate, and deterministic merge but is unavailable to the Agent, pull request CI, and review-event receivers.
+      - Workflow configuration uses exact on.roles, tools.github.min-integrity approved, approval labels, and refusal labels without a pre-validation label command.
+      - Delivery writes use an exact active snapshot; a separate restrictive cleanup gate binds the old episode and invalidating event and permits only gate failure, terminal evidence, and authorized old-PR closure.
+      - Event-time raw project and task snapshots are preserved as non-Agent inputs and rechecked with issue state, authorization state, dependencies, current pull request head, and checks immediately before every safe output.
+      - A separate integrity-filtered projection is the only issue content given to the Agent, while later runs use the recorded authorizing actor and raw digest rather than label presence alone.
+      - Repository, issue number, task digest, and authorization generation select one deterministic branch and pull request marker; duplicate runs become no-ops and update failure cannot force-push or create a fallback pull request.
+      - Protected-file changes stop as human-needed, and safe-output fallbacks that could create another issue or pull request are disabled.
+      - Review events run in an unprivileged receiver without secrets or write tokens; only a trusted default-branch workflow_run controller can use the delivery credential after re-reading GitHub metadata.
+      - The accepted event matrix covers authorization, issue revision or revocation, configured CI, Agent review, gate and receiver completion, authorized operational resume or recheck, and pull request closure; other self-generated events are no-ops.
+      - Every terminal attempt records durable episode, attempt, raw and Agent-input digests, task digest, selected engine and version, commit, head, check result, and artifact digest evidence outside expiring workflow logs.
+
+  - id: question-review-merge-controller
+    title: Continue through dependencies, questions, review, and merge gates
+    depends_on: [github-issue-to-draft-pr]
+    references:
+      - docs/project-overview.md#delegation-policy
+      - docs/project-overview.md#delivery-and-questions
+      - adr/0006-add-an-event-driven-improvement-loop.md
+    outcome: >-
+      Separate GitHub events resume blocked delivery episodes, apply supported
+      CI and review findings, and stop or enable the approved merge policy from
+      deterministic current-state checks.
+    verify:
+      - An incomplete dependency sets a durable blocked state, performs no task work, and is re-evaluated when merged verified dependency evidence appears.
+      - A material ambiguity persists the suspended transition, asks one focused question, sets autodev:needs-input, removes autodev:ready last, and ends the run; retrying any partial step is idempotent.
+      - A material answer is incorporated into the issue body and requires an authorized maintainer to reapply autodev:ready; a non-content operational unblock requires an authorized command bound to the unchanged digest.
+      - A fresh review evaluates each new head against the task, applied Knowledge revisions, current code, and project-owned checks.
+      - Attempt count, last processed head, and normalized failure signature persist across runs; self-generated events are ignored, one initial delivery plus two corrections are allowed, and no-progress stops early.
+      - Supported findings update the existing branch while unsupported or conflicting findings are recorded without blind implementation.
+      - An authorized issue edit or approved project revision supersedes the old episode, closes its unmerged pull request through the cleanup gate, records its replacement digest, and preserves the linked lineage; an allowed cancel actor can abandon an unmerged episode.
+      - Authorizer role permits supersession cleanup only, while cancel role permits abandonment cleanup; an actor outside the required role can only cause the exact stale gate to fail.
+      - An untrusted edit or close may fail only the exact task gate; it cannot close a pull request, change labels, merge, or authorize cleanup.
+      - Merged is an absorbing terminal state, so later issue closure is a no-op; controller-closed superseded pull requests cannot be reclassified as abandoned.
+      - The deterministic controller revalidates task, head, CI, mergeability, every unresolved review thread, GitHub review decision, configured approvals, questions, ruleset, and protected files immediately before readiness or merge output.
+      - A review thread that cannot be resolved by the integration stops as human-needed instead of soft-skipping the gate.
+      - One trusted job publishes autodev/gate for the exact head and completes; a separate trusted merge job repeats validation and calls GitHub's merge API with that SHA, with a changed head or HTTP 409 failing closed.
+      - For an unprotected task with all gates passing, auto_after_gates performs the direct squash merge with the repository-scoped delivery credential, which cannot bypass the ruleset; otherwise the pull request remains ready for human action.
+      - A controller-resolved thread triggers a trusted autodev-recheck dispatch; a human-resolved thread waits for an authorized recheck comment because GitHub emits no thread-resolved Actions event.
+
+  - id: knowledge-judgment-loop
+    title: Judge complete task outcomes against existing Knowledge
+    depends_on: [question-review-merge-controller]
+    references:
+      - docs/project-overview.md#evidence-insights-and-knowledge
+      - adr/0006-add-an-event-driven-improvement-loop.md
+    outcome: >-
+      Complete delivery evidence can produce deduplicated pending insights that
+      are compared with applicable Knowledge, retained privately first, and
+      promoted only through a separately authorized Knowledge contribution.
+    verify:
+      - Successful, failed, rejected, abandoned, and exhausted outcomes can contribute raw evidence without copying full logs.
+      - Evidence records applied or rejected Knowledge revisions so later judgment can relate advice to outcomes; a more public project stores only opaque digests while the private identifier mapping remains in the authorized candidate carrier.
+      - Final insight judgment waits for merge, explicit abandonment, or exhausted escalation and considers every attempt, review, user decision, and superseded episode in the linked lineage.
+      - An insight records its claim, context, applicability, durable evidence, discovery date, verification date, and confirm, qualify, contradict, supersede, duplicate, or unrelated relationship.
+      - Pending, deferred, dismissed, and accepted records are searched before a candidate is created; pending insight cannot approve a task, authorize a write, or expand Agent authority.
+      - Stable Knowledge source aliases declare visibility without exposing machine paths; missing visibility is private, and the configured candidate carrier is writable and at least as restrictive as every source.
+      - A private carrier may receive a candidate automatically, while a public carrier receives only an opaque review-needed record until an authorized session regenerates content and a human approves sanitization.
+      - A separately authorized adapter can open one non-overwriting pull request to the configured Knowledge target, with syshin0116/dev-knowledge used only by this project's dogfood configuration.
+      - Project-only decisions and sensitive source identifiers remain in the project, and the proposing run cannot approve its own Knowledge contribution.
+
+  - id: autonomous-loop-dogfood
+    title: Dogfood the complete issue-to-insight loop
+    depends_on: [knowledge-judgment-loop]
     references:
       - docs/project-overview.md#flow
-      - docs/project-overview.md#decisions
-      - docs/research/reference-workflows.md#host-discovery-and-project-reentry
-    outcome: >-
-      After one setup, a fresh supported Agent Host can recognize an Autodev
-      planning or execution request from ordinary language, recover durable
-      project state, and continue without the user remembering the Skill name.
-    verify:
-      - Codex and Claude Code setup preserves existing Host instruction content, adds one managed routing block and one native import when needed, and is byte-idempotent when repeated.
-      - A Host without AGENTS.md or CLAUDE.md discovery can use an equivalent repository-scoped native Skill or instruction location without changing the Autodev state contract.
-      - The routing block contains no copied task, tool, approval, or evidence state and does not require a hook or daemon.
-      - Fresh Codex and Claude Code sessions route substantial project start, pending-plan continuation, approval, and next-planned-task requests without the user naming Autodev.
-      - A fresh session with a completed plan reports completion without inventing another task or revision.
-      - An isolated maintenance request in an Autodev project and an ordinary request in a non-Autodev project do not invoke Autodev.
-      - When the Skill is unavailable, a planning or execution request explains the missing capability and leaves planning, approval, and evidence unchanged.
-
-  - id: project-tool-registration
-    title: Register project tools without duplicating capability metadata
-    depends_on: []
-    references:
-      - docs/project-overview.md#decisions
-      - docs/research/reference-workflows.md#useful-precedents
-    outcome: >-
-      During planning, Autodev can register a successfully checked project tool
-      with only its name, project-specific purpose, and selected interface,
-      and Planning Revision Validation binds that registration without copying
-      general capability metadata or machine-specific state.
-    verify:
-      - Successful CLI and MCP registration cases write only the tool name, purpose, and interface to project configuration and approval.
-      - A Host-supported interface beyond CLI and MCP can be registered without changing the configuration schema.
-      - Missing interfaces, interface mismatches, and failed required authentication leave project configuration and approval unchanged.
-      - Registration does not install or authenticate a tool; after an explicit user request, it uses the Host's existing setup mechanism and repeats the check.
-      - A directly callable CLI or MCP tool can be registered without a matching Skill.
-      - Adding, removing, renaming, or changing the purpose or interface of a registered tool fails validation until the new mapping is approved.
-      - Equivalent YAML ordering passes, while blank names or purposes and fields for capabilities, credentials, status, or verification time are rejected.
-      - Local-file and GitHub-Issues task sources enforce the same tool-registration approval rule before any GitHub API read.
-      - Two tools with overlapping general capabilities can coexist when their project-specific purposes are distinct.
-      - Existing projects without a tools mapping continue to validate.
-
-  - id: reusable-ci-knowledge-template
-    title: Reuse current CI knowledge safely
-    depends_on: [project-tool-registration]
-    references:
-      - docs/project-overview.md#decisions
-      - adr/0003-keep-ci-templates-in-user-knowledge.md
-    outcome: >-
-      Software planning can select a sourced CI template from user-owned
-      knowledge, challenge mutable guidance against current official sources,
-      and create target-owned baseline CI before independent feature work.
-    verify:
-      - A stale CI fixture contributes applicable guidance without carrying incompatible commands or action versions into the approved plan.
-      - The first template records creation, meaningful update, verification, staleness, and official sources beside its linked assets.
-      - Generated GitHub Actions CI uses least privilege, full commit SHA pins, project-owned checks, and an update path for remote actions.
-      - When a project publishes an installable artifact, CI builds it, installs it in a clean environment, and exercises a public entry point.
-      - Applying or improving a template does not modify the selected read-only Knowledge Root.
-
-  - id: portability-check
-    title: Validate portability and non-software use
-    depends_on: [host-discoverable-reentry, reusable-ci-knowledge-template]
-    references:
-      - docs/project-overview.md#users
       - docs/project-overview.md#success-criteria
     outcome: >-
-      The unchanged core Skill crosses the approval boundary in a second Agent
-      Host and handles a non-software fixture without code-only assumptions.
+      Real Autodev issues demonstrate dependency release, uninterrupted
+      delivery, question and resume, bounded review correction, merge policy,
+      durable evidence, and Knowledge judgment without another local chat run.
     verify:
-      - Both Agent Hosts produce the same artifact types and enforce the approval gate.
-      - Actual Host differences are isolated outside the core design contract.
-      - A supplied opportunity reaches an approved Overview and Task Graph.
+      - One authorized unprotected issue reaches a CI-passing, reviewed, squash-merged pull request through auto_after_gates.
+      - One dependent issue performs no work until merged verified evidence releases it, then resumes without new authorization when its snapshot is unchanged.
+      - One issue stops on a material question and resumes only after body update and new trusted authorization.
+      - Cancellation by an allowed actor abandons one episode, closes its unmerged pull request, and does not release its dependent task; an untrusted close only fails the gate, and reopening alone performs no work.
+      - Reopening and reauthorizing the unchanged task after abandonment creates one new generation, branch, and pull request while retaining the abandoned generation's evidence without overwrite.
+      - Revising one active task supersedes its prior episode so only one pull request for that issue is active at a time.
+      - Replaying authorization, pull request, check, review, and controller events may create duplicate runs but leaves one episode, branch, pull request, durable evidence set, and insight candidate.
+      - A task or project change between initial validation and any write is caught by the final non-Agent gate and produces no stale output.
+      - Repeating one failure signature stops before the correction budget and leaves a durable human-needed explanation.
+      - The resulting insight is suppressed with an existing-record reference or proposed once with visibility-safe provenance, and no tested path exposes a private identifier, promotes its own candidate, or expands its authority.
