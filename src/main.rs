@@ -1,44 +1,18 @@
 use autodev_planning_revision::{
-    ValidationError, project_revision, task_source_projection, validate,
+    CliCommand, EpisodeEvent, ReadyEvent, Result, TaskAuthorization, ValidationError,
+    authorize_task_with_api, parse_cli, project_revision, request_github, task_snapshot,
+    task_source_projection, transition_episode_with_api, validate,
 };
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 use std::env;
-use std::path::PathBuf;
+use std::fs;
+use std::path::Path;
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
-    let mut arguments = env::args_os().skip(1);
-    let first = arguments.next();
-    let command = first.as_deref().and_then(|value| value.to_str());
-    let result = match command {
-        Some("--print-task-projection") => {
-            one_root(&mut arguments).and_then(|root| task_source_projection(&root).and_then(json))
-        }
-        Some("--print-validated-task-projection") => one_root(&mut arguments).and_then(|root| {
-            validate(&root)
-                .and_then(|value| {
-                    value.ok_or_else(|| {
-                        ValidationError::new(
-                            "configured task source is not a rooted github_issues source",
-                        )
-                    })
-                })
-                .and_then(json)
-        }),
-        Some("--print-project-revision") => {
-            one_root(&mut arguments).and_then(|root| project_revision(&root).and_then(json))
-        }
-        _ => {
-            let root = first
-                .map(PathBuf::from)
-                .unwrap_or_else(|| PathBuf::from("."));
-            if arguments.next().is_some() {
-                Err(ValidationError::new("expected one project root"))
-            } else {
-                validate(&root).map(|_| "Planning revision valid.".to_owned())
-            }
-        }
-    };
+    let arguments: Vec<String> = env::args().skip(1).collect();
+    let result = parse_cli(&arguments).and_then(run);
 
     match result {
         Ok(output) => {
@@ -52,19 +26,76 @@ fn main() -> ExitCode {
     }
 }
 
-fn one_root(
-    arguments: &mut impl Iterator<Item = std::ffi::OsString>,
-) -> Result<PathBuf, ValidationError> {
-    let root = arguments
-        .next()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("."));
-    if arguments.next().is_some() {
-        return Err(ValidationError::new("expected one project root"));
+fn run(command: CliCommand) -> Result<String> {
+    match command {
+        CliCommand::Validate { root } => {
+            validate(&root).map(|_| "Planning revision valid.".to_owned())
+        }
+        CliCommand::PrintProjectRevision { root } => project_revision(&root).and_then(json),
+        CliCommand::PrintTaskProjection { root } => task_source_projection(&root).and_then(json),
+        CliCommand::PrintValidatedTaskProjection { root } => validate(&root)
+            .and_then(|value| {
+                value.ok_or_else(|| {
+                    ValidationError::new(
+                        "configured task source is not a rooted github_issues source",
+                    )
+                })
+            })
+            .and_then(json),
+        CliCommand::PrintTaskSnapshot { root, issue } => task_snapshot(&root, issue).and_then(json),
+        CliCommand::Authorize {
+            root,
+            issue,
+            event,
+            agent_input,
+            prior,
+        } => {
+            let validated = task_snapshot(&root, issue)?;
+            let event: ReadyEvent = read_json(&event, "ready event")?;
+            let agent_input = read_bytes(&agent_input, "agent input")?;
+            let prior: Vec<TaskAuthorization> = match prior {
+                Some(path) => read_json(&path, "prior authorization record")?,
+                None => Vec::new(),
+            };
+            authorize_task_with_api(
+                &validated.project_revision,
+                &validated.task_snapshot,
+                &agent_input,
+                &event,
+                &prior,
+                &request_github,
+            )
+            .and_then(json)
+        }
+        CliCommand::Transition {
+            root,
+            event,
+            current,
+        } => {
+            let project_revision = project_revision(&root)?;
+            let event: EpisodeEvent = read_json(&event, "episode event")?;
+            let current: TaskAuthorization = read_json(&current, "current authorization record")?;
+            transition_episode_with_api(&project_revision, &current, &event, &request_github)
+                .and_then(json)
+        }
     }
-    Ok(root)
 }
 
-fn json(value: impl Serialize) -> Result<String, ValidationError> {
+fn read_bytes(path: &Path, label: &str) -> Result<Vec<u8>> {
+    fs::read(path).map_err(|error| {
+        ValidationError::new(format!(
+            "{label} is unreadable at {}: {error}",
+            path.display()
+        ))
+    })
+}
+
+fn read_json<T: DeserializeOwned>(path: &Path, label: &str) -> Result<T> {
+    let bytes = read_bytes(path, label)?;
+    serde_json::from_slice(&bytes)
+        .map_err(|error| ValidationError::new(format!("{label} is invalid: {error}")))
+}
+
+fn json(value: impl Serialize) -> Result<String> {
     serde_json::to_string_pretty(&value).map_err(|error| ValidationError::new(error.to_string()))
 }

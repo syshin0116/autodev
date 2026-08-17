@@ -726,6 +726,172 @@ pub fn task_snapshot_with_api(
     })
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum CliCommand {
+    Validate {
+        root: PathBuf,
+    },
+    PrintProjectRevision {
+        root: PathBuf,
+    },
+    PrintTaskProjection {
+        root: PathBuf,
+    },
+    PrintValidatedTaskProjection {
+        root: PathBuf,
+    },
+    PrintTaskSnapshot {
+        root: PathBuf,
+        issue: u64,
+    },
+    Authorize {
+        root: PathBuf,
+        issue: u64,
+        event: PathBuf,
+        agent_input: PathBuf,
+        prior: Option<PathBuf>,
+    },
+    Transition {
+        root: PathBuf,
+        event: PathBuf,
+        current: PathBuf,
+    },
+}
+
+/// Parses the delivery adapter's command line. The three original print
+/// commands keep their positional project root so recorded evidence commands
+/// stay runnable.
+pub fn parse_cli(arguments: &[String]) -> Result<CliCommand> {
+    let Some((command, rest)) = arguments.split_first() else {
+        return Ok(CliCommand::Validate {
+            root: PathBuf::from("."),
+        });
+    };
+    match command.as_str() {
+        "--print-project-revision" => Ok(CliCommand::PrintProjectRevision {
+            root: positional_root(rest)?,
+        }),
+        "--print-task-projection" => Ok(CliCommand::PrintTaskProjection {
+            root: positional_root(rest)?,
+        }),
+        "--print-validated-task-projection" => Ok(CliCommand::PrintValidatedTaskProjection {
+            root: positional_root(rest)?,
+        }),
+        "--print-task-snapshot" => {
+            let mut options = CliOptions::parse(rest, command)?;
+            let command = CliCommand::PrintTaskSnapshot {
+                root: options.path("root")?,
+                issue: options.issue()?,
+            };
+            options.finish()?;
+            Ok(command)
+        }
+        "--authorize" => {
+            let mut options = CliOptions::parse(rest, command)?;
+            let command = CliCommand::Authorize {
+                root: options.path("root")?,
+                issue: options.issue()?,
+                event: options.path("event")?,
+                agent_input: options.path("agent-input")?,
+                prior: options.optional_path("prior"),
+            };
+            options.finish()?;
+            Ok(command)
+        }
+        "--transition" => {
+            let mut options = CliOptions::parse(rest, command)?;
+            let command = CliCommand::Transition {
+                root: options.path("root")?,
+                event: options.path("event")?,
+                current: options.path("current")?,
+            };
+            options.finish()?;
+            Ok(command)
+        }
+        unsupported if unsupported.starts_with("--") => Err(ValidationError::new(format!(
+            "unsupported command: {unsupported}"
+        ))),
+        _ => Ok(CliCommand::Validate {
+            root: positional_root(arguments)?,
+        }),
+    }
+}
+
+struct CliOptions {
+    command: String,
+    values: BTreeMap<String, String>,
+}
+
+impl CliOptions {
+    fn parse(arguments: &[String], command: &str) -> Result<Self> {
+        let mut values = BTreeMap::new();
+        let mut remaining = arguments.iter();
+        while let Some(argument) = remaining.next() {
+            let name = argument.strip_prefix("--").ok_or_else(|| {
+                ValidationError::new(format!("{command} expects --name value options"))
+            })?;
+            let value = remaining.next().ok_or_else(|| {
+                ValidationError::new(format!("{command} option --{name} is missing its value"))
+            })?;
+            if values.insert(name.to_owned(), value.clone()).is_some() {
+                return Err(ValidationError::new(format!(
+                    "{command} option --{name} is repeated"
+                )));
+            }
+        }
+        Ok(Self {
+            command: command.to_owned(),
+            values,
+        })
+    }
+
+    fn path(&mut self, name: &str) -> Result<PathBuf> {
+        self.optional_path(name)
+            .ok_or_else(|| ValidationError::new(format!("{} requires --{name}", self.command)))
+    }
+
+    fn optional_path(&mut self, name: &str) -> Option<PathBuf> {
+        self.values
+            .remove(name)
+            .map(|value| value.trim().to_owned())
+            .filter(|value| !value.is_empty())
+            .map(PathBuf::from)
+    }
+
+    fn issue(&mut self) -> Result<u64> {
+        let value = self
+            .values
+            .remove("issue")
+            .ok_or_else(|| ValidationError::new(format!("{} requires --issue", self.command)))?;
+        value
+            .trim()
+            .parse::<u64>()
+            .ok()
+            .filter(|issue| *issue > 0)
+            .ok_or_else(|| {
+                ValidationError::new("task issue number must be a positive integer".to_owned())
+            })
+    }
+
+    fn finish(self) -> Result<()> {
+        match self.values.keys().next() {
+            Some(unsupported) => Err(ValidationError::new(format!(
+                "{} does not accept --{unsupported}",
+                self.command
+            ))),
+            None => Ok(()),
+        }
+    }
+}
+
+fn positional_root(arguments: &[String]) -> Result<PathBuf> {
+    match arguments {
+        [] => Ok(PathBuf::from(".")),
+        [root] => Ok(PathBuf::from(root)),
+        _ => Err(ValidationError::new("expected one project root")),
+    }
+}
+
 fn authorize_task(
     project_revision: &ProjectRevisionOutput,
     task_snapshot: &TaskSnapshotOutput,
@@ -2174,7 +2340,7 @@ pub fn github_api_args(endpoint: &str, paginated: bool) -> Vec<String> {
     arguments
 }
 
-fn request_github(endpoint: &str, paginated: bool) -> Result<JsonValue> {
+pub fn request_github(endpoint: &str, paginated: bool) -> Result<JsonValue> {
     let output = Command::new("gh")
         .args(github_api_args(endpoint, paginated))
         .env("GH_PROMPT_DISABLED", "1")
