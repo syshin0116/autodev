@@ -1,0 +1,167 @@
+name: Autodev authorize
+
+# Trusted controller for one ready event. It runs from the default branch,
+# never executes pull request code, and hands the Agent nothing but the
+# integrity-filtered projection produced here. Every event value reaches the
+# shell through the environment so issue content cannot become script.
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  actions: write # dispatch the delivery workflow
+  contents: read
+  issues: write
+
+concurrency:
+  group: autodev-episode-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  REPOSITORY: ${{ github.repository }}
+  DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+  REPOSITORY_ID: ${{ github.event.repository.id }}
+  RUN_ID: ${{ github.run_id }}
+  ISSUE: ${{ github.event.issue.number }}
+  ISSUE_ID: ${{ github.event.issue.id }}
+  ISSUE_NODE_ID: ${{ github.event.issue.node_id }}
+  AUTHOR_ASSOCIATION: ${{ github.event.issue.author_association }}
+  LABEL: ${{ github.event.label.name }}
+  ACTOR: ${{ github.event.sender.login }}
+  ACTOR_ID: ${{ github.event.sender.id }}
+  STATE_MARKER: "<!-- autodev:authorization -->"
+
+jobs:
+  authorize:
+    name: authorize
+    if: github.event.label.name == 'autodev:ready'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Resolve the authorizing actor role
+        id: actor
+        run: |
+          set -euo pipefail
+          role=$(gh api "repos/$REPOSITORY/collaborators/$ACTOR/permission" --jq '.role_name // .permission')
+          echo "role=$role" >> "$GITHUB_OUTPUT"
+
+      - name: Read the approved task snapshot
+        run: |
+          set -euo pipefail
+          cargo run --locked --quiet -- --print-task-snapshot --root . --issue "$ISSUE" > snapshot.json
+
+      # A body from outside the trusted associations is withheld rather than
+      # filtered in place, so untrusted text never reaches the engine.
+      - name: Build the integrity-filtered agent input
+        run: |
+          set -euo pipefail
+          case "$AUTHOR_ASSOCIATION" in
+            OWNER | MEMBER | COLLABORATOR) trusted=true ;;
+            *) trusted=false ;;
+          esac
+          {
+            jq -r '"# " + .task_snapshot.projection.title' snapshot.json
+            echo
+            if [ "$trusted" = true ]; then
+              jq -r '.task_snapshot.projection.body // ""' snapshot.json
+            else
+              echo "The issue body was withheld because its author association is $AUTHOR_ASSOCIATION."
+            fi
+            echo
+            jq -r '"Blocked by: " + ([.task_snapshot.projection.blocked_by[].issue_number | tostring] | join(", ") | if . == "" then "none" else . end)' snapshot.json
+          } > agent-input.md
+
+      - name: Build the ready event
+        run: |
+          set -euo pipefail
+          jq -n \
+            --argjson repository_id "$REPOSITORY_ID" \
+            --argjson run_id "$RUN_ID" \
+            --argjson issue_id "$ISSUE_ID" \
+            --arg issue_node_id "$ISSUE_NODE_ID" \
+            --argjson issue_number "$ISSUE" \
+            --arg label "$LABEL" \
+            --argjson actor_id "$ACTOR_ID" \
+            --arg actor "$ACTOR" \
+            --arg actor_role "${{ steps.actor.outputs.role }}" \
+            --slurpfile snapshot snapshot.json \
+            '{
+              repository_id: $repository_id,
+              run_id: $run_id,
+              issue_id: $issue_id,
+              issue_node_id: $issue_node_id,
+              issue_number: $issue_number,
+              label: $label,
+              actor_id: $actor_id,
+              actor: $actor,
+              actor_role: $actor_role,
+              task_sha256: $snapshot[0].task_snapshot.sha256,
+              project_revision_sha256: $snapshot[0].project_revision.sha256
+            }' > ready-event.json
+
+      - name: Read the durable authorization record
+        id: prior
+        run: |
+          set -euo pipefail
+          gh api "repos/$REPOSITORY/issues/$ISSUE/comments" --paginate --slurp \
+            --jq "[.[][] | select(.body | startswith(env.STATE_MARKER))] | last // {}" > state-comment.json
+          comment_id=$(jq -r '.id // ""' state-comment.json)
+          echo "comment_id=$comment_id" >> "$GITHUB_OUTPUT"
+          if [ -z "$comment_id" ]; then
+            echo '[]' > prior.json
+          else
+            jq -r '.body' state-comment.json | sed -n '/^```json$/,/^```$/p' | sed '1d;$d' > prior.json
+          fi
+          jq -e 'type == "array"' prior.json > /dev/null
+
+      - name: Decide the authorization
+        run: |
+          set -euo pipefail
+          cargo run --locked --quiet -- --authorize \
+            --root . --issue "$ISSUE" \
+            --event ready-event.json \
+            --agent-input agent-input.md \
+            --prior prior.json > decision.json
+          jq -r '"action=" + .action' decision.json
+
+      # Persisting the record before any side effect is what turns a duplicate
+      # run into a no-op instead of a second episode.
+      - name: Persist the authorization record
+        run: |
+          set -euo pipefail
+          jq -s '.[0] + [.[1].authorization]
+                 | group_by(.episode.authorization_generation)
+                 | map(last)' prior.json decision.json > next.json
+          {
+            printf '%s\n\n' "$STATE_MARKER"
+            printf 'Autodev authorization record, written by the trusted controller.\n\n'
+            printf '```json\n'
+            cat next.json
+            printf '```\n'
+          } > next-comment.md
+          if [ -n "${{ steps.prior.outputs.comment_id }}" ]; then
+            gh api -X PATCH "repos/$REPOSITORY/issues/comments/${{ steps.prior.outputs.comment_id }}" \
+              -F body=@next-comment.md > /dev/null
+          else
+            gh api -X POST "repos/$REPOSITORY/issues/$ISSUE/comments" \
+              -F body=@next-comment.md > /dev/null
+          fi
+
+      - name: Dispatch delivery
+        run: |
+          set -euo pipefail
+          action=$(jq -r '.action' decision.json)
+          if [ "$action" != "start" ] && [ "$action" != "replay" ]; then
+            gh issue edit "$ISSUE" --repo "$REPOSITORY" --add-label "autodev:human-needed"
+            echo "::error::authorization returned $action, which requires human judgment"
+            exit 1
+          fi
+          gh workflow run autodev-deliver.lock.yml \
+            --ref "$DEFAULT_BRANCH" \
+            -f issue_number="$ISSUE" \
+            -f task_sha256="$(jq -r '.authorization.episode.task_sha256' decision.json)" \
+            -f authorization_generation="$(jq -r '.authorization.episode.authorization_generation' decision.json)" \
+            -f agent_input_base64="$(base64 -w0 agent-input.md)"
