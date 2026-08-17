@@ -1,8 +1,11 @@
 project: autodev
 status: approved
 approved_by: user
-approved_at: "2026-08-16T02:42:17+09:00"
+approved_at: "2026-08-17T20:26:38+09:00"
 source: chat approval
-files:
-  docs/project-overview.md: 872e6ddbf353ac5d6c820003041daac6257f77be88e76b10a592e96e21285d6a
-  tasks.yaml: ef1fa0eaf797aa3356dba532b2820a6316f393b5e665ad68dab6f2d5950b2acb
+planning_revision:
+  project_overview:
+    path: docs/project-overview.md
+    sha256: 872e6ddbf353ac5d6c820003041daac6257f77be88e76b10a592e96e21285d6a
+  project:
+    sha256: 77a0d00d131a091773c631aa9c2a52427bb2cec4ae813d51cbd8cb421f9a1d7f
