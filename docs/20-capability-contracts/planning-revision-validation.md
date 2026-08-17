@@ -148,6 +148,34 @@ Validate approval and print the exact rooted GitHub snapshot to use for executio
 cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- --print-validated-task-projection <project-root>
 ```
 
+### Rootless delivery decisions
+
+These commands are for a trusted adapter job, never for the Agent. Each reads its inputs from files, prints one JSON decision, and writes nothing. The adapter owns per-issue serialization and persistence.
+
+Validate approval and print the raw snapshot for one authorized issue. It requires the approved ready label, so an unlabeled issue fails closed:
+
+```sh
+cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- \
+  --print-task-snapshot --root <project-root> --issue <number>
+```
+
+Decide one ready event. `--event` is a `ReadyEvent`, `--agent-input` is the integrity-filtered bytes the Agent will receive, and `--prior` is the durable authorization record list for that issue, omitted for a first authorization:
+
+```sh
+cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- \
+  --authorize --root <project-root> --issue <number> \
+  --event <ready-event.json> --agent-input <agent-input> [--prior <authorizations.json>]
+```
+
+Decide one episode transition. `--current` is the authorization record returned by the previous decision:
+
+```sh
+cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- \
+  --transition --root <project-root> --event <episode-event.json> --current <authorization.json>
+```
+
+The printed record is the next durable state. Persist it before any side effect, then supply it as `--prior` or `--current` on the following decision. Replaying the same event identity returns a no-op rather than a second episode.
+
 ## Result
 
 Success means only that the declared project plan is closed, structurally valid, readable, and identical to the approval record. Rooted execution uses the Issue Graph projection returned by that validation call. A trusted Host-side adapter uses the Rust library boundary to retain a rootless raw task snapshot outside Agent input, then passes only integrity-filtered input and the two digests onward. Any incomplete GitHub read, API error, malformed response, or digest mismatch fails closed without modifying project files.
