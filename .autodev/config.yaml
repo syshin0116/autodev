@@ -1,3 +1,64 @@
 project_overview: docs/project-overview.md
-task_graph: tasks.yaml
+task_source:
+  type: github_issues
+  repository: syshin0116/autodev
 knowledge_roots: []
+authorization:
+  ready_label: "autodev:ready"
+  refusal_labels:
+    - "autodev:needs-input"
+    - "autodev:human-needed"
+  authorizer_roles:
+    - admin
+  cancel_roles:
+    - admin
+delivery:
+  base_branch: main
+  protected_paths:
+    - ".autodev/**"
+    - ".github/workflows/**"
+  required_checks:
+    - ci
+  review:
+    required_approvals: 0
+    require_code_owner_review: false
+    require_thread_resolution: true
+    require_up_to_date_branch: true
+  merge_mode: auto_after_gates
+  correction_budget: 2
+engine_policy:
+  allowed_providers:
+    - openai
+  data_use_boundary: no_training_on_project_data
+  cost_class: metered_standard
+selected_engine:
+  provider: openai
+  name: codex
+  version: host-managed
+tools:
+  gh:
+    purpose: Read GitHub issue, pull request, check, and review state for validation and delivery decisions
+    interface: cli
+    permissions:
+      - github:read
+  codex:
+    purpose: Run the delivery Agent engine for one authorized task snapshot
+    interface: cli
+    permissions:
+      - github:read
+      - workspace:write
+  cargo:
+    purpose: Build, test, and run Planning Revision Validation
+    interface: cli
+    permissions:
+      - workspace:write
+knowledge:
+  sources:
+    - alias: dev-knowledge
+      visibility: public
+  candidate_carrier:
+    identity: syshin0116/autodev:evidence/insight-candidates
+    visibility: public
+  target:
+    identity: syshin0116/dev-knowledge
+    visibility: public
