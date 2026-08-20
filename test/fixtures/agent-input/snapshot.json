@@ -1,0 +1,18 @@
+{
+  "project_revision": { "sha256": "0000000000000000000000000000000000000000000000000000000000000000" },
+  "task_snapshot": {
+    "sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "projection": {
+      "schema_version": 1,
+      "repository_node_id": "R_example",
+      "issue": { "issue_id": 1, "issue_node_id": "I_example", "issue_number": 7 },
+      "title": "Turn one authorized issue into a verified draft pull request",
+      "body": "## Outcome\n\nOne example outcome.\n",
+      "blocked_by": [
+        { "issue_id": 2, "issue_node_id": "I_a", "issue_number": 5 },
+        { "issue_id": 3, "issue_node_id": "I_b", "issue_number": 6 }
+      ],
+      "project_revision_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  }
+}

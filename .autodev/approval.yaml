@@ -1,11 +1,11 @@
 project: autodev
 status: approved
 approved_by: user
-approved_at: "2026-08-17T20:26:38+09:00"
+approved_at: "2026-08-20T16:10:48+09:00"
 source: chat approval
 planning_revision:
   project_overview:
     path: docs/project-overview.md
-    sha256: 872e6ddbf353ac5d6c820003041daac6257f77be88e76b10a592e96e21285d6a
+    sha256: b065e1c939f83459ccfdf398e060885f87b056656f9ea48bcd62583c08979790
   project:
-    sha256: 77a0d00d131a091773c631aa9c2a52427bb2cec4ae813d51cbd8cb421f9a1d7f
+    sha256: c098076b0a38687e6b77198e688617e07421d195a04e1c676be883712f5de23a

@@ -28,9 +28,10 @@ delivery:
   correction_budget: 2
 engine_policy:
   allowed_providers:
+    - anthropic
     - openai
-  data_use_boundary: no_training_on_project_data
-  cost_class: metered_standard
+  data_use_boundary: operator_local_subscription_no_training
+  cost_class: subscription_included
 selected_engine:
   provider: openai
   name: codex
@@ -42,7 +43,7 @@ tools:
     permissions:
       - github:read
   codex:
-    purpose: Run the delivery Agent engine for one authorized task snapshot
+    purpose: Run the delivery Agent engine locally for one authorized task snapshot
     interface: cli
     permissions:
       - github:read

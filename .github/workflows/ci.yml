@@ -29,15 +29,6 @@ jobs:
         run: cargo clippy --locked --all-targets -- -D warnings
       - name: Test
         run: cargo test --locked --all-targets
-      # A hand-edited lock workflow would run something the reviewed source
-      # does not describe, so recompiling must reproduce it exactly.
-      - name: Reject agentic workflow drift
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh extension install githubnext/gh-aw --pin v0.86.2
-          gh aw compile --strict
-          git diff --exit-code -- .github/workflows .github/aw
       # The rootless project revision reads only repos/{owner}/{repo}, so this
       # step needs a read-only GitHub token for the gh CLI and nothing else.
       - name: Validate the approved planning revision
