@@ -1,0 +1,22 @@
+[
+  [
+    {
+      "id": 1,
+      "body": "A human comment.\n"
+    },
+    {
+      "id": 2,
+      "body": "<!-- autodev:authorization -->\n\nAutodev authorization record, written by the trusted controller.\n\n```json\n[\n  {\n    \"episode\": {\n      \"issue_number\": 16,\n      \"authorization_generation\": 1\n    },\n    \"status\": \"active\"\n  }\n]\n```\n"
+    }
+  ],
+  [
+    {
+      "id": 3,
+      "body": "Another human comment.\n"
+    },
+    {
+      "id": 4,
+      "body": "<!-- autodev:authorization -->\n\nAutodev authorization record, written by the trusted controller.\n\n```json\n[\n  {\n    \"episode\": {\n      \"issue_number\": 16,\n      \"authorization_generation\": 2\n    },\n    \"status\": \"active\"\n  }\n]\n```\n"
+    }
+  ]
+]

@@ -30,7 +30,6 @@ done
 digest() { shasum -a 256 "$1" | cut -d' ' -f1; }
 fail() { echo "STOP: $*" >&2; exit 1; }
 
-export STATE_MARKER='<!-- autodev:authorization -->'
 repository=$(sed -n '/^task_source:/,/^[a-z]/p' .autodev/config.yaml | sed -n 's/^  repository: //p')
 [ -n "$repository" ] || fail "config has no github_issues task source"
 
@@ -40,12 +39,10 @@ trap 'echo "episode workspace: $work"' EXIT
 # The durable record is authority for what was authorized. Rebuilding the
 # snapshot and the agent input here is what catches a task edited after
 # authorization.
-gh api "repos/$repository/issues/$issue/comments" --paginate --slurp \
-  --jq '[.[][] | select(.body | startswith(env.STATE_MARKER))] | last // {}' > "$work/state-comment.json"
-[ "$(jq -r '.id // ""' "$work/state-comment.json")" != "" ] \
+scripts/autodev-episode-record.sh "$repository" "$issue" > "$work/record.json"
+[ "$(jq -r '.authorizations | length' "$work/record.json")" != "0" ] \
   || fail "issue #$issue has no authorization record; apply autodev:ready first"
-jq -r '.body' "$work/state-comment.json" | sed -n '/^```json$/,/^```$/p' | sed '1d;$d' > "$work/record.json"
-jq 'max_by(.episode.authorization_generation)' "$work/record.json" > "$work/episode.json"
+jq '.authorizations | max_by(.episode.authorization_generation)' "$work/record.json" > "$work/episode.json"
 
 status=$(jq -r '.status' "$work/episode.json")
 [ "$status" = "active" ] || fail "episode status is $status, not active"
