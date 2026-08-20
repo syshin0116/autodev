@@ -46,7 +46,7 @@ scripts/autodev-deliver.sh --issue 7 --apply  # also pushes the branch and opens
 
 The runner refuses before touching anything when the issue has no authorization record, the episode is not active, the task or project revision digest changed after authorization, the rebuilt agent input does not match, or the branch already has an open pull request. A change touching `.autodev/**` or `.github/workflows/**` labels the issue `autodev:human-needed` and stops.
 
-Work happens in a scratch git worktree under the system temp directory, so the operator's checkout is never disturbed. The engine log stays there.
+Work happens in a scratch git worktree under the system temp directory, so the operator's checkout is never disturbed. The worktree is released when the run ends, and a run that pushed nothing also deletes its branch, so the same episode can be claimed again. The engine log and the produced diff stay in the workspace, whose path is printed on exit.
 
 ## Not implemented yet
 
