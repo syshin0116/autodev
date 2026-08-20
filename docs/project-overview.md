@@ -63,7 +63,8 @@ due or contradicted Knowledge -> current-source research
 ### Product boundary
 
 - Keep one portable Autodev Skill for planning and judgment. The Skill is not a daemon or model runtime.
-- Add event-driven delivery as a replaceable adapter. The first adapter uses GitHub Agentic Workflows in GitHub Actions and Codex as its first engine. The selected engine and model version are operational state inside the approved provider, data-use, and cost policy.
+- Add event-driven delivery as a replaceable adapter. GitHub Actions holds authorization and the deterministic gates, while the engine runs on an operator-invoked local host with its existing subscription. The selected engine and model version are operational state inside the approved provider, data-use, and cost policy.
+- Accept that implementation advances only while the operator runs the delivery command. GitHub holds durable episode state between runs, so an unavailable machine delays work instead of losing it.
 - Use GitHub Issues, pull requests, checks, comments, and labels as durable workflow state. Do not add a queue, Task database, or paused model process.
 - Keep the core vocabulary provider-neutral, but implement only GitHub before a real project requires another Task Source or delivery environment.
 - Preserve general planning and conversational execution for non-software work. The first autonomous delivery adapter applies only to repository-based work.
@@ -98,12 +99,12 @@ Task-source cutover is a planning transition, not an executable issue. The local
 
 ### Delivery and questions
 
-- Run the Agent in a constrained environment with read-only GitHub access by default. Apply repository writes through validated, least-privilege outputs.
-- Commit the human-readable Agentic Workflow source and its compiled lock workflow. Pin the compiler and actions, validate strictly, reject generated drift, and use staged output for the first live event.
+- Give the Agent the integrity-filtered projection and a working tree, never a repository credential. The runner performs the branch, push, and pull request after project-owned checks pass, so an Agent claim is never itself a write.
+- Commit the local runner and keep its inputs deterministic. It claims one authorized episode from the durable record, refuses a task whose digest no longer matches, and prints its intended writes before performing them on a first run.
 - Require project-owned checks before a pull request can become ready. Agent pull request CI has `contents: read`, receives no secrets or write token, and performs no deployment or release. A repository without this baseline CI must establish it before autonomous feature issues become ready.
 - Use a repository-scoped delivery credential with only Contents, Pull requests, and Checks read and write access. It supplies the extra commit that starts CI, publishes the task-bound gate, and performs the deterministic merge, but is never available to the Agent, pull request CI, or review-event receivers. Privileged controller jobs run only from trusted default-branch workflow definitions, read metadata, and never execute pull request code or consume its artifacts.
 - Create or update one draft pull request for an authorized task. Never create parallel pull requests for retries of the same task revision.
-- Block protected-file changes in the first milestone and end the episode as `human-needed`. Disable safe-output fallbacks that could create another issue or pull request.
+- Block protected-file changes in the first milestone and end the episode as `human-needed`. Disable any fallback that could create another issue or pull request.
 - Review each current pull request head in a fresh run. Treat review findings as hypotheses until supported by the approved task, applicable Knowledge, current code, or executable checks.
 - Automatically correct supported findings within the approved correction budget. Store attempt count, last processed head, and normalized failure signature with the delivery episode. Process only the configured event transitions; other self-generated events are no-ops.
 - Ask one focused question and end the run when user judgment is required. Persist the suspended transition first, then publish the question and `autodev:needs-input`, and remove `autodev:ready` last. Each step is idempotent. Incorporate a material answer into the issue body, then require an authorized maintainer to reapply `autodev:ready`. Resume a credential or other non-content unblock through an authorized command bound to the unchanged task digest.
@@ -114,7 +115,7 @@ The first adapter reacts only to this event matrix:
 
 | Event | Accepted use |
 | --- | --- |
-| `issues:labeled` | Start only when an allowed actor applies `autodev:ready` to an open issue. |
+| `issues:labeled` | Authorize only when an allowed actor applies `autodev:ready` to an open issue. Authorization records the episode; the operator's runner performs the delivery. |
 | `issues:edited` | An allowed authorizer may supersede and clean up the old episode; an untrusted edit only fails its gate. |
 | `issues:unlabeled`, `issues:closed` | An allowed cancel actor may abandon and clean up the episode; an untrusted event only fails its gate. |
 | `issues:reopened` | Wait for a new ready authorization. |
@@ -145,7 +146,7 @@ Configure exact `on.roles`, `tools.github.min-integrity: approved`, `approval-la
 - Let Agent Hosts and tools describe their general capabilities. Project configuration records only the choice and purpose for this project.
 - Reuse templates from selected read-only Knowledge Roots after checking applicability, provenance, and mutable guidance against current official sources.
 
-These proposed boundaries are recorded in [ADR 0006](../adr/0006-add-an-event-driven-improvement-loop.md). When accepted, ADR 0006 activates ADR 0001's runtime upgrade trigger and supersedes ADR 0004's whole-Issue-Graph approval boundary.
+These boundaries are recorded in [ADR 0006](../adr/0006-add-an-event-driven-improvement-loop.md), which activated ADR 0001's runtime upgrade trigger and superseded ADR 0004's whole-Issue-Graph approval boundary. [ADR 0007](../adr/0007-run-the-delivery-engine-on-a-local-host.md) narrows where its engine runs.
 
 ## Success criteria
 
@@ -186,6 +187,7 @@ After the issue-to-insight loop is dogfooded, add a deterministic `stale_after` 
 - [ADR 0001: Keep the first version thin](../adr/0001-thin-first-version.md)
 - [ADR 0004: Use GitHub Issues for project tasks](../adr/0004-use-github-issues-for-project-tasks.md)
 - [ADR 0006: Add an event-driven improvement loop](../adr/0006-add-an-event-driven-improvement-loop.md)
+- [ADR 0007: Run the delivery engine on a local host](../adr/0007-run-the-delivery-engine-on-a-local-host.md)
 - [Reference workflow findings](research/reference-workflows.md)
 - [GitHub Agentic Workflows](https://github.github.com/gh-aw/)
 - [GitHub Agentic Workflows safe outputs](https://github.github.com/gh-aw/reference/safe-outputs/)

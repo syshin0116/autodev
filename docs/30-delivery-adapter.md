@@ -1,27 +1,27 @@
 # Delivery Adapter
 
-The first adapter turns one authorized issue into a draft pull request. It is two workflows with different trust levels, not one agent with write access.
+The first adapter turns one authorized issue into a draft pull request. GitHub decides and remembers; the operator's machine implements.
 
 - [Trust split](#trust-split)
 - [Authorization record](#authorization-record)
 - [Agent input](#agent-input)
-- [Staged first event](#staged-first-event)
+- [Running a delivery](#running-a-delivery)
 - [Not implemented yet](#not-implemented-yet)
 
 ## Trust split
 
-`autodev-authorize.yml` is the trusted controller. It runs from the default branch on `issues: labeled`, holds `contents: read`, `issues: write`, and `actions: write`, and never executes pull request code. Every event value reaches its shell through the environment, so issue text cannot become script.
-
-Its job is to decide, not to implement:
+`autodev-authorize.yml` is the trusted controller. It runs from the default branch on `issues: labeled`, holds `contents: read` and `issues: write`, runs no engine, and writes no code. Every event value reaches its shell through the environment, so issue text cannot become script.
 
 1. Resolve the actor's repository role through the collaborators API.
 2. Read the approved task snapshot with `--print-task-snapshot`, which fails closed without the approved ready label.
 3. Build the integrity-filtered agent input and the `ReadyEvent`.
 4. Call `--authorize` with the prior authorization record.
 5. Persist the returned record before any side effect.
-6. Dispatch delivery only for a `start` or `replay` action. Anything else labels the issue `autodev:human-needed` and fails the run.
+6. Report a claimable episode, or label the issue `autodev:human-needed` and fail for any other action.
 
-`autodev-deliver.md` is the agentic workflow, compiled to `autodev-deliver.lock.yml` by gh-aw v0.86.2. The agent job is read-only: `contents: read`, `issues: read`, `pull-requests: read`. It reaches the repository only through validated safe outputs, and its single output is one draft pull request with `protected-files: blocked` and no issue fallback. Both the source and the lock file are committed, every action and container is pinned by digest, and CI recompiles to reject drift.
+`scripts/autodev-deliver.sh` is the local runner. It claims one recorded episode, runs the engine with the operator's subscription, and performs the branch, push, and pull request itself after the checks pass. The engine gets a working tree and the filtered projection, never a repository credential, and is told not to commit or push.
+
+Delivery therefore advances only while the operator runs the command. [ADR 0007](../adr/0007-run-the-delivery-engine-on-a-local-host.md) records why.
 
 ## Authorization record
 
@@ -31,21 +31,26 @@ The comment is a carrier, not authority. It holds no approval-bound planning con
 
 ## Agent input
 
-The controller writes the only task description the Agent sees. It contains the title, the body, and the blocking issue numbers from the snapshot projection. A body whose author association is outside `OWNER`, `MEMBER`, or `COLLABORATOR` is withheld with a stated reason rather than filtered in place, and the Agent is instructed to stop when it sees that.
+`scripts/autodev-agent-input.sh` builds the only task description the Agent sees: the title, the body, and the blocking issue numbers from the snapshot projection. A body whose author association is outside `OWNER`, `MEMBER`, or `COLLABORATOR` is withheld with a stated reason rather than filtered in place, and an association that could not be read aborts rather than guessing.
 
-The input travels as a base64 workflow input and is decoded to `/tmp/gh-aw/agent/autodev-task.md` before the Agent starts. The raw issue body and the filtered projection keep separate digests in the authorization record.
+The controller and the runner both call that script, so the runner can compare its rebuild against the recorded `agent_input_sha256`. Changing the script's output changes that digest and invalidates every in-flight episode. `tests/agent_input.rs` pins the output.
 
-## Staged first event
+## Running a delivery
 
-`safe-outputs.staged: true` makes the first live event print its intended writes instead of performing them. Remove it only after a real event has produced the expected staged output.
+```sh
+scripts/autodev-deliver.sh --issue 7          # stops after the checks and prints intended writes
+scripts/autodev-deliver.sh --issue 7 --apply  # also pushes the branch and opens the draft pull request
+```
 
-Delivery also needs `CODEX_API_KEY` or `OPENAI_API_KEY` in repository secrets. Without it the agent job fails before doing anything.
+The runner refuses before touching anything when the issue has no authorization record, the episode is not active, the task or project revision digest changed after authorization, the rebuilt agent input does not match, or the branch already has an open pull request. A change touching `.autodev/**` or `.github/workflows/**` labels the issue `autodev:human-needed` and stops.
+
+Work happens in a scratch git worktree under the system temp directory, so the operator's checkout is never disturbed. The engine log stays there.
 
 ## Not implemented yet
 
 These belong to the remaining verification bullets on the delivery and controller issues:
 
 - The repository-scoped delivery credential, the CI-trigger commit, `autodev/gate`, and the deterministic merge job. `autodev/gate` is deliberately absent from the base branch ruleset until something can publish it.
-- Dependency blocking, questions and `autodev:needs-input`, review correction inside the correction budget, and the `--transition` events that suspend, supersede, or abandon an episode.
-- Durable per-attempt evidence outside expiring workflow logs.
-- Enforcing the approved `protected_paths` by name. The safe output currently blocks top-level dot folders, which covers `.autodev/**` and `.github/workflows/**`, but it is not yet derived from the approved project revision.
+- Dependency blocking, questions and `autodev:needs-input`, review correction inside the correction budget, and the `--transition` events that suspend, supersede, or abandon an episode. Until those exist, a failed episode can only be retried by removing its authorization record by hand.
+- Durable per-attempt evidence outside the local engine log.
+- Deriving the protected paths from the approved project revision instead of hard-coding them in the runner.

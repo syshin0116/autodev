@@ -1,16 +1,16 @@
 name: Autodev authorize
 
-# Trusted controller for one ready event. It runs from the default branch,
-# never executes pull request code, and hands the Agent nothing but the
-# integrity-filtered projection produced here. Every event value reaches the
-# shell through the environment so issue content cannot become script.
+# Trusted controller for one ready event. It runs from the default branch and
+# decides authorization; it never runs an engine and never writes code. The
+# operator's local runner claims the recorded episode. Every event value
+# reaches the shell through the environment so issue content cannot become
+# script.
 
 on:
   issues:
     types: [labeled]
 
 permissions:
-  actions: write # dispatch the delivery workflow
   contents: read
   issues: write
 
@@ -21,7 +21,6 @@ concurrency:
 env:
   GH_TOKEN: ${{ github.token }}
   REPOSITORY: ${{ github.repository }}
-  DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
   REPOSITORY_ID: ${{ github.event.repository.id }}
   RUN_ID: ${{ github.run_id }}
   ISSUE: ${{ github.event.issue.number }}
@@ -58,21 +57,7 @@ jobs:
       - name: Build the integrity-filtered agent input
         run: |
           set -euo pipefail
-          case "$AUTHOR_ASSOCIATION" in
-            OWNER | MEMBER | COLLABORATOR) trusted=true ;;
-            *) trusted=false ;;
-          esac
-          {
-            jq -r '"# " + .task_snapshot.projection.title' snapshot.json
-            echo
-            if [ "$trusted" = true ]; then
-              jq -r '.task_snapshot.projection.body // ""' snapshot.json
-            else
-              echo "The issue body was withheld because its author association is $AUTHOR_ASSOCIATION."
-            fi
-            echo
-            jq -r '"Blocked by: " + ([.task_snapshot.projection.blocked_by[].issue_number | tostring] | join(", ") | if . == "" then "none" else . end)' snapshot.json
-          } > agent-input.md
+          scripts/autodev-agent-input.sh snapshot.json "$AUTHOR_ASSOCIATION" > agent-input.md
 
       - name: Build the ready event
         run: |
@@ -150,7 +135,9 @@ jobs:
               -F body=@next-comment.md > /dev/null
           fi
 
-      - name: Dispatch delivery
+      # Delivery is not started here. The operator's runner claims the recorded
+      # episode, so this step only reports whether the episode is claimable.
+      - name: Report the decision
         run: |
           set -euo pipefail
           action=$(jq -r '.action' decision.json)
@@ -159,9 +146,7 @@ jobs:
             echo "::error::authorization returned $action, which requires human judgment"
             exit 1
           fi
-          gh workflow run autodev-deliver.lock.yml \
-            --ref "$DEFAULT_BRANCH" \
-            -f issue_number="$ISSUE" \
-            -f task_sha256="$(jq -r '.authorization.episode.task_sha256' decision.json)" \
-            -f authorization_generation="$(jq -r '.authorization.episode.authorization_generation' decision.json)" \
-            -f agent_input_base64="$(base64 -w0 agent-input.md)"
+          {
+            echo "Episode $(jq -r '.authorization.episode.authorization_generation' decision.json) is authorized for issue #$ISSUE."
+            echo "Run scripts/autodev-deliver.sh --issue $ISSUE locally to deliver it."
+          } >> "$GITHUB_STEP_SUMMARY"
