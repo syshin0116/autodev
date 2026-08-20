@@ -91,16 +91,9 @@ jobs:
         id: prior
         run: |
           set -euo pipefail
-          gh api "repos/$REPOSITORY/issues/$ISSUE/comments" --paginate --slurp \
-            --jq "[.[][] | select(.body | startswith(env.STATE_MARKER))] | last // {}" > state-comment.json
-          comment_id=$(jq -r '.id // ""' state-comment.json)
-          echo "comment_id=$comment_id" >> "$GITHUB_OUTPUT"
-          if [ -z "$comment_id" ]; then
-            echo '[]' > prior.json
-          else
-            jq -r '.body' state-comment.json | sed -n '/^```json$/,/^```$/p' | sed '1d;$d' > prior.json
-          fi
-          jq -e 'type == "array"' prior.json > /dev/null
+          scripts/autodev-episode-record.sh "$REPOSITORY" "$ISSUE" > record.json
+          jq -r '.authorizations' record.json > prior.json
+          echo "comment_id=$(jq -r '.comment_id // ""' record.json)" >> "$GITHUB_OUTPUT"
 
       - name: Decide the authorization
         run: |

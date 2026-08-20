@@ -27,6 +27,8 @@ Delivery therefore advances only while the operator runs the command. [ADR 0007]
 
 The durable record is one comment on the issue, marked with `<!-- autodev:authorization -->` and carrying a JSON array of authorization records in a fenced block. The controller upserts it and keeps the latest record per authorization generation.
 
+`scripts/autodev-episode-record.sh` is the only reader of that comment, shared by the controller and the runner, and `tests/episode_record.rs` covers a record on a later comment page, an issue with no record, and a damaged record that must fail instead of looking like a first authorization.
+
 The comment is a carrier, not authority. It holds no approval-bound planning content, so editing it cannot change what was approved; a tampered record produces a decision that fails its own gate. Per-issue serialization comes from the workflow concurrency group `autodev-episode-<issue>`, which never cancels a run in progress.
 
 ## Agent input
