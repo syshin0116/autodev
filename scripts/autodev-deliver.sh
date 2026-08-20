@@ -11,6 +11,8 @@ set -euo pipefail
 
 issue=""
 apply=false
+branch=""
+pushed=false
 while [ $# -gt 0 ]; do
   case "$1" in
     --issue) issue=${2:?issue number}; shift 2 ;;
@@ -34,7 +36,21 @@ repository=$(sed -n '/^task_source:/,/^[a-z]/p' .autodev/config.yaml | sed -n 's
 [ -n "$repository" ] || fail "config has no github_issues task source"
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/autodev-episode-XXXXXX")
-trap 'echo "episode workspace: $work"' EXIT
+tree="$work/tree"
+
+# A run that pushes nothing must leave nothing behind, or the next claim for
+# the same episode cannot create its branch.
+release_episode() {
+  if [ -d "$tree" ]; then
+    git -C "$tree" diff > "$work/change.diff" 2>/dev/null || true
+    git worktree remove --force "$tree" > /dev/null 2>&1 || true
+  fi
+  if [ "$pushed" != true ] && [ -n "$branch" ]; then
+    git branch -D "$branch" > /dev/null 2>&1 || true
+  fi
+  echo "episode workspace: $work"
+}
+trap release_episode EXIT
 
 # The durable record is authority for what was authorized. Rebuilding the
 # snapshot and the agent input here is what catches a task edited after
@@ -60,11 +76,13 @@ scripts/autodev-agent-input.sh "$work/snapshot.json" "$association" > "$work/age
   || fail "the agent input no longer matches the authorized digest"
 
 branch="autodev/issue-$issue-gen$generation"
+if git show-ref --quiet "refs/heads/$branch"; then
+  fail "$branch already exists locally; remove it before claiming this episode again"
+fi
 if [ -n "$(gh pr list --repo "$repository" --head "$branch" --state open --json number --jq '.[].number')" ]; then
   fail "$branch already has an open pull request; the correction loop is not implemented yet"
 fi
 
-tree="$work/tree"
 git fetch --quiet origin
 git worktree add --quiet -b "$branch" "$tree" origin/main
 cp "$work/agent-input.md" "$tree/.autodev-task.md"
@@ -116,5 +134,6 @@ fi
 git -C "$tree" add -A
 git -C "$tree" commit --quiet -m "$title" -m "Authorized issue #$issue, generation $generation."
 git -C "$tree" push --quiet -u origin "$branch"
+pushed=true
 gh pr create --repo "$repository" --base main --head "$branch" --draft \
   --title "$title" --body-file "$work/pr-body.md"
