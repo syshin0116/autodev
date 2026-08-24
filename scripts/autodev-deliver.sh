@@ -65,6 +65,8 @@ trap release_episode EXIT
 # snapshot and the agent input here is what catches a task edited after
 # authorization.
 scripts/autodev-episode-record.sh "$repository" "$issue" > "$work/record.json"
+jq -r '.authorizations' "$work/record.json" > "$work/prior.json"
+comment_id=$(jq -r '.comment_id // ""' "$work/record.json")
 [ "$(jq -r '.authorizations | length' "$work/record.json")" != "0" ] \
   || fail "issue #$issue has no authorization record; apply autodev:ready first"
 jq '.authorizations | max_by(.episode.authorization_generation)' "$work/record.json" > "$work/episode.json"
@@ -113,11 +115,48 @@ fi
 git fetch --quiet origin
 git worktree add --quiet -b "$branch" "$tree" "origin/$base"
 cp "$work/agent-input.md" "$tree/.autodev-task.md"
-echo ".autodev-task.md" >> "$(git -C "$tree" rev-parse --git-path info/exclude)"
+{
+  echo ".autodev-task.md"
+  echo ".autodev-question.md"
+} >> "$(git -C "$tree" rev-parse --git-path info/exclude)"
 
 echo "Running the engine for issue #$issue, generation $generation."
 codex exec --sandbox workspace-write --cd "$tree" "$(cat "$root/scripts/delivery-prompt.md")" \
   2>&1 | tee "$work/engine.log"
+
+# A missing decision suspends the episode instead of guessing. The suspension
+# is recorded before the question is published, and the ready label is removed
+# last, so an interrupted run can be repeated safely.
+question="$tree/.autodev-question.md"
+if [ -s "$question" ]; then
+  echo "The engine needs a decision:"
+  cat "$question"
+  if [ "$apply" != true ]; then
+    echo "Would suspend the episode, publish this question, and remove the ready label."
+    echo "Re-run with --apply to perform these writes."
+    exit 0
+  fi
+  jq -n \
+    --argjson event_id "$(date +%s)" \
+    --slurpfile episode "$work/episode.json" \
+    '{kind: "needs_input_recorded",
+      repository_id: $episode[0].episode.repository_id,
+      event_id: $event_id,
+      episode: $episode[0].episode,
+      project_revision_sha256: $episode[0].project_revision_sha256,
+      actor: null}' > "$work/needs-input-event.json"
+  cargo run --locked --quiet -- --transition \
+    --root . --event "$work/needs-input-event.json" --current "$work/episode.json" > "$work/decision.json"
+  jq -s '.[0] + [.[1].authorization]
+         | group_by(.episode.authorization_generation)
+         | map(last)' "$work/prior.json" "$work/decision.json" > "$work/next.json"
+  scripts/autodev-record-write.sh "$repository" "$issue" "$comment_id" "$work/next.json"
+  gh issue comment "$issue" --repo "$repository" --body-file "$question" > /dev/null
+  gh issue edit "$issue" --repo "$repository" --add-label "autodev:needs-input" > /dev/null
+  gh issue edit "$issue" --repo "$repository" --remove-label "autodev:ready" > /dev/null
+  echo "Suspended issue #$issue and published the question."
+  exit 0
+fi
 
 changed=$(git -C "$tree" status --porcelain | awk '{print $NF}')
 [ -n "$changed" ] || fail "the engine produced no change"
