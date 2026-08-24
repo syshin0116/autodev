@@ -174,6 +174,14 @@ cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- \
   --transition --root <project-root> --event <episode-event.json> --current <authorization.json>
 ```
 
+Complete a merged episode. `--evidence` is the verified evidence for that exact episode, and `--merged-into` must be the approved base branch:
+
+```sh
+cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- \
+  --complete-merge --root <project-root> --current <authorization.json> \
+  --evidence <evidence.json> --merged-into <branch>
+```
+
 The printed record is the next durable state. Persist it before any side effect, then supply it as `--prior` or `--current` on the following decision. Replaying the same event identity returns a no-op rather than a second episode.
 
 ## Result

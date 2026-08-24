@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::PathBuf;
 use std::process::{Command, Output};
 
@@ -52,4 +53,74 @@ fn a_damaged_record_fails_instead_of_looking_empty() {
         assert!(!output.status.success(), "{fixture}");
         assert!(output.stdout.is_empty(), "{fixture}");
     }
+}
+
+// The writer and the reader are the two halves of one format. A round trip is
+// the only cheap way to keep them from drifting apart.
+#[test]
+fn a_written_record_reads_back_unchanged() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let temp = std::env::temp_dir().join(format!("autodev-record-{}", std::process::id()));
+    fs::create_dir_all(&temp).expect("temp dir");
+    let authorizations = temp.join("authorizations.json");
+    let written = serde_json::json!([
+        {"episode": {"issue_number": 16, "authorization_generation": 2}, "status": "abandoned"}
+    ]);
+    fs::write(
+        &authorizations,
+        serde_json::to_vec_pretty(&written).expect("serialize"),
+    )
+    .expect("write authorizations");
+
+    let body = Command::new(root.join("scripts/autodev-record-write.sh"))
+        .args(["owner/repo", "16", ""])
+        .arg(&authorizations)
+        .env("AUTODEV_RECORD_DRY_RUN", "1")
+        .output()
+        .expect("render the record comment");
+    assert!(
+        body.status.success(),
+        "{}",
+        String::from_utf8_lossy(&body.stderr)
+    );
+
+    let comments = temp.join("comments.json");
+    let page = serde_json::json!([[{
+        "id": 42,
+        "body": String::from_utf8(body.stdout).expect("utf-8 body")
+    }]]);
+    fs::write(&comments, serde_json::to_vec(&page).expect("serialize")).expect("write comments");
+
+    let read = Command::new(root.join("scripts/autodev-episode-record.sh"))
+        .args(["owner/repo", "16"])
+        .env("AUTODEV_COMMENTS_FILE", &comments)
+        .output()
+        .expect("read the record");
+    assert!(
+        read.status.success(),
+        "{}",
+        String::from_utf8_lossy(&read.stderr)
+    );
+    let record: serde_json::Value = serde_json::from_slice(&read.stdout).expect("json");
+    assert_eq!(record["comment_id"], 42);
+    assert_eq!(record["authorizations"], written);
+
+    fs::remove_dir_all(&temp).ok();
+}
+
+#[test]
+fn an_empty_authorization_list_is_refused() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let temp = std::env::temp_dir().join(format!("autodev-record-empty-{}", std::process::id()));
+    fs::create_dir_all(&temp).expect("temp dir");
+    let empty = temp.join("empty.json");
+    fs::write(&empty, b"[]").expect("write empty");
+    let output = Command::new(root.join("scripts/autodev-record-write.sh"))
+        .args(["owner/repo", "16", ""])
+        .arg(&empty)
+        .env("AUTODEV_RECORD_DRY_RUN", "1")
+        .output()
+        .expect("run the writer");
+    assert!(!output.status.success());
+    fs::remove_dir_all(&temp).ok();
 }

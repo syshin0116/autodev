@@ -3,6 +3,7 @@
 The first adapter turns one authorized issue into a draft pull request. GitHub decides and remembers; the operator's machine implements.
 
 - [Trust split](#trust-split)
+- [Ending an episode](#ending-an-episode)
 - [Authorization record](#authorization-record)
 - [Agent input](#agent-input)
 - [Running a delivery](#running-a-delivery)
@@ -23,11 +24,24 @@ The first adapter turns one authorized issue into a draft pull request. GitHub d
 
 Delivery therefore advances only while the operator runs the command. [ADR 0007](../adr/0007-run-the-delivery-engine-on-a-local-host.md) records why.
 
+## Ending an episode
+
+`autodev-transition.yml` ends episodes. It reacts to a merged or closed pull request, removal of the ready label, and issue closure, and decides every outcome through the Rust boundary.
+
+Pull request closure arrives as `pull_request_target` so the workflow definition always comes from the default branch, and the workflow never checks out or runs pull request code.
+
+- A merged pull request completes the episode as `merged`, which is absorbing. Completion requires the approved base branch and every required check passing on that pull request, so a merge that skipped the gates cannot claim success.
+- Closing the issue is also how a merge reports itself, so an issue closure is a no-op when the episode's branch already has a merged pull request. Success does not abandon itself.
+- Ready-label removal, issue closure, and closing the pull request unmerged abandon the episode when the actor holds a cancel role. Any other actor only fails that gate, and nothing is written.
+- Abandonment then runs cleanup: close the open pull request, delete the episode branch, and record `cleanup_completed`. Only after that can reapplying the ready label start the next authorization generation, which is what makes a failed episode retryable.
+
+Event identity is `run_id * 10 + kind`, so re-running a run replays one identity and becomes a no-op, while two kinds inside one run stay distinct.
+
 ## Authorization record
 
 The durable record is one comment on the issue, marked with `<!-- autodev:authorization -->` and carrying a JSON array of authorization records in a fenced block. The controller upserts it and keeps the latest record per authorization generation.
 
-`scripts/autodev-episode-record.sh` is the only reader of that comment, shared by the controller and the runner, and `tests/episode_record.rs` covers a record on a later comment page, an issue with no record, and a damaged record that must fail instead of looking like a first authorization.
+`scripts/autodev-record-write.sh` is the only writer of that comment and `scripts/autodev-episode-record.sh` is the only reader, shared by both controllers and the runner, and `tests/episode_record.rs` covers a writer to reader round trip, a record on a later comment page, an issue with no record, and a damaged record that must fail instead of looking like a first authorization.
 
 The comment is a carrier, not authority. It holds no approval-bound planning content, so editing it cannot change what was approved; a tampered record produces a decision that fails its own gate. Per-issue serialization comes from the workflow concurrency group `autodev-episode-<issue>`, which never cancels a run in progress.
 
@@ -53,6 +67,7 @@ Work happens in a scratch git worktree under the system temp directory, so the o
 These belong to the remaining verification bullets on the delivery and controller issues:
 
 - The repository-scoped delivery credential, the CI-trigger commit, `autodev/gate`, and the deterministic merge job. `autodev/gate` is deliberately absent from the base branch ruleset until something can publish it.
-- Dependency blocking, questions and `autodev:needs-input`, review correction inside the correction budget, and the `--transition` events that suspend, supersede, or abandon an episode. Until those exist, a failed episode can only be retried by removing its authorization record by hand.
+- Dependency blocking, questions and `autodev:needs-input`, review correction inside the correction budget, and the supersession path for an authorized task edit.
+- Serialization between an issue event and a pull request event for the same episode. Their concurrency groups differ, so the library's event identity and status guards are what keep a racing pair from corrupting the record.
 - Durable per-attempt evidence outside the local engine log.
 - Deriving the protected paths from the approved project revision instead of hard-coding them in the runner.

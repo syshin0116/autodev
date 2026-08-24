@@ -1,7 +1,7 @@
 use autodev_planning_revision::{
     CliCommand, EpisodeEvent, ReadyEvent, Result, TaskAuthorization, ValidationError,
-    authorize_task_with_api, parse_cli, project_revision, request_github, task_snapshot,
-    task_source_projection, transition_episode_with_api, validate,
+    VerifiedEvidence, authorize_task_with_api, complete_episode_merge, parse_cli, project_revision,
+    request_github, task_snapshot, task_source_projection, transition_episode_with_api, validate,
 };
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -76,6 +76,18 @@ fn run(command: CliCommand) -> Result<String> {
             let event: EpisodeEvent = read_json(&event, "episode event")?;
             let current: TaskAuthorization = read_json(&current, "current authorization record")?;
             transition_episode_with_api(&project_revision, &current, &event, &request_github)
+                .and_then(json)
+        }
+        CliCommand::CompleteMerge {
+            root,
+            current,
+            evidence,
+            merged_into,
+        } => {
+            let project_revision = project_revision(&root)?;
+            let current: TaskAuthorization = read_json(&current, "current authorization record")?;
+            let evidence: VerifiedEvidence = read_json(&evidence, "verified evidence")?;
+            complete_episode_merge(&project_revision, &current, &evidence, &merged_into)
                 .and_then(json)
         }
     }
