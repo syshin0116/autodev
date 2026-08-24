@@ -169,6 +169,41 @@ fn a_transition_reads_the_event_and_the_current_record() {
 }
 
 #[test]
+fn merge_completion_names_the_branch_it_merged_into() {
+    assert_eq!(
+        parse(&[
+            "--complete-merge",
+            "--root",
+            ".",
+            "--current",
+            "record.json",
+            "--evidence",
+            "evidence.json",
+            "--merged-into",
+            "main",
+        ]),
+        CliCommand::CompleteMerge {
+            root: PathBuf::from("."),
+            current: PathBuf::from("record.json"),
+            evidence: PathBuf::from("evidence.json"),
+            merged_into: "main".to_owned(),
+        }
+    );
+    assert_eq!(
+        error(&[
+            "--complete-merge",
+            "--root",
+            ".",
+            "--current",
+            "record.json",
+            "--evidence",
+            "evidence.json",
+        ]),
+        "--complete-merge requires --merged-into"
+    );
+}
+
+#[test]
 fn malformed_options_are_rejected_instead_of_ignored() {
     assert_eq!(
         error(&["--transition", "--root", ".", "--event"]),

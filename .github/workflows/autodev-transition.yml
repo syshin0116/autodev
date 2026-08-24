@@ -1,0 +1,199 @@
+name: Autodev transition
+
+# Trusted controller for ending an episode. It runs from the default branch and
+# never checks out or executes pull request code, which is why pull request
+# closure arrives as pull_request_target. Every decision goes through the Rust
+# boundary; this workflow only reads GitHub state and persists the result.
+#
+# Event identity is run_id * 10 + kind, so re-running a run replays the same
+# identity and becomes a no-op, while two kinds in one run stay distinct.
+
+on:
+  issues:
+    types: [unlabeled, closed]
+  pull_request_target:
+    types: [closed]
+
+permissions:
+  contents: write # delete the episode branch during cleanup
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: autodev-episode-${{ github.event.issue.number || github.event.pull_request.head.ref }}
+  cancel-in-progress: false
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  REPOSITORY: ${{ github.repository }}
+  REPOSITORY_ID: ${{ github.event.repository.id }}
+  RUN_ID: ${{ github.run_id }}
+  ACTOR: ${{ github.event.sender.login }}
+  ACTOR_ID: ${{ github.event.sender.id }}
+  EVENT_NAME: ${{ github.event_name }}
+  EVENT_ACTION: ${{ github.event.action }}
+  ISSUE_NUMBER: ${{ github.event.issue.number }}
+  HEAD_REF: ${{ github.event.pull_request.head.ref }}
+  PULL_NUMBER: ${{ github.event.pull_request.number }}
+  PULL_MERGED: ${{ github.event.pull_request.merged }}
+  PULL_BASE: ${{ github.event.pull_request.base.ref }}
+
+jobs:
+  transition:
+    name: transition
+    if: >-
+      (github.event_name == 'issues' && github.event.action == 'closed') ||
+      (github.event_name == 'issues' && github.event.action == 'unlabeled' && github.event.label.name == 'autodev:ready') ||
+      (github.event_name == 'pull_request_target' && startsWith(github.event.pull_request.head.ref, 'autodev/issue-'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Resolve the episode
+        id: episode
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "issues" ]; then
+            issue=$ISSUE_NUMBER
+            generation=""
+            case "$EVENT_ACTION" in
+              closed) kind=issue_closed; ordinal=2 ;;
+              unlabeled) kind=ready_removed; ordinal=1 ;;
+              *) echo "::error::unexpected issue action $EVENT_ACTION"; exit 1 ;;
+            esac
+          else
+            issue=$(printf '%s' "$HEAD_REF" | sed -n 's|^autodev/issue-\([0-9]\{1,\}\)-gen[0-9]\{1,\}$|\1|p')
+            generation=$(printf '%s' "$HEAD_REF" | sed -n 's|^autodev/issue-[0-9]\{1,\}-gen\([0-9]\{1,\}\)$|\1|p')
+            [ -n "$issue" ] && [ -n "$generation" ] || { echo "::notice::head ref is not an episode branch"; exit 0; }
+            kind=pull_request_closed_without_merge
+            ordinal=4
+          fi
+          {
+            echo "issue=$issue"
+            echo "generation=$generation"
+            echo "kind=$kind"
+            echo "event_id=$((RUN_ID * 10 + ordinal))"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Read the durable authorization record
+        id: record
+        env:
+          ISSUE: ${{ steps.episode.outputs.issue }}
+          GENERATION: ${{ steps.episode.outputs.generation }}
+        run: |
+          set -euo pipefail
+          scripts/autodev-episode-record.sh "$REPOSITORY" "$ISSUE" > record.json
+          jq -r '.authorizations' record.json > prior.json
+          echo "comment_id=$(jq -r '.comment_id // ""' record.json)" >> "$GITHUB_OUTPUT"
+          if [ "$(jq 'length' prior.json)" = "0" ]; then
+            echo "::notice::issue #$ISSUE has no authorization record"
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -n "$GENERATION" ]; then
+            jq --argjson g "$GENERATION" '[.[] | select(.episode.authorization_generation == $g)] | first // empty' prior.json > episode.json
+          else
+            jq 'max_by(.episode.authorization_generation)' prior.json > episode.json
+          fi
+          if [ ! -s episode.json ]; then
+            echo "::notice::no episode matches this event"
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "present=true" >> "$GITHUB_OUTPUT"
+          jq -r '"episode generation " + (.episode.authorization_generation | tostring) + " is " + .status' episode.json
+
+      - name: Complete a merged episode
+        id: merge
+        if: steps.record.outputs.present == 'true' && github.event_name == 'pull_request_target' && github.event.pull_request.merged == true
+        run: |
+          set -euo pipefail
+          cargo run --locked --quiet -- --print-project-revision . > project.json
+          base=$(jq -r '.projection.delivery.base_branch' project.json)
+          [ "$PULL_BASE" = "$base" ] || { echo "::error::pull request merged into $PULL_BASE, not $base"; exit 1; }
+          gh pr view "$PULL_NUMBER" --repo "$REPOSITORY" \
+            --json statusCheckRollup --jq '[.statusCheckRollup[] | {name, conclusion}]' > checks.json
+          missing=$(jq -r --slurpfile project project.json \
+            '$project[0].projection.delivery.required_checks - [.[] | select(.conclusion == "SUCCESS") | .name] | join(", ")' checks.json)
+          [ -z "$missing" ] || { echo "::error::required checks did not pass: $missing"; exit 1; }
+          jq -n \
+            --arg task "$(jq -r '.episode.task_sha256' episode.json)" \
+            --arg project_revision "$(jq -r '.project_revision_sha256' episode.json)" \
+            --argjson generation "$(jq -r '.episode.authorization_generation' episode.json)" \
+            '{task_sha256: $task, project_revision_sha256: $project_revision,
+              authorization_generation: $generation, verified: true}' > evidence.json
+          cargo run --locked --quiet -- --complete-merge \
+            --root . --current episode.json --evidence evidence.json --merged-into "$base" > decision.json
+          jq -r '"action=" + .action + " status=" + .authorization.status' decision.json
+
+      - name: Decide the transition
+        id: transition
+        if: steps.record.outputs.present == 'true' && steps.merge.outcome == 'skipped'
+        env:
+          KIND: ${{ steps.episode.outputs.kind }}
+          EVENT_ID: ${{ steps.episode.outputs.event_id }}
+        run: |
+          set -euo pipefail
+          branch="autodev/issue-$(jq -r '.episode.issue_number' episode.json)-gen$(jq -r '.episode.authorization_generation' episode.json)"
+          # Closing an issue is how a merge reports itself, so a merged episode
+          # must not be abandoned by its own success.
+          if [ "$KIND" = "issue_closed" ] \
+            && [ -n "$(gh pr list --repo "$REPOSITORY" --head "$branch" --state merged --json number --jq '.[0].number // ""')" ]; then
+            echo "::notice::episode $branch was merged, so the issue closure is a no-op"
+            echo "action=no_op" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          role=$(gh api "repos/$REPOSITORY/collaborators/$ACTOR/permission" --jq '.role_name // .permission')
+          jq -n \
+            --arg kind "$KIND" \
+            --argjson repository_id "$REPOSITORY_ID" \
+            --argjson event_id "$EVENT_ID" \
+            --slurpfile episode episode.json \
+            --argjson actor_id "$ACTOR_ID" \
+            --arg actor "$ACTOR" \
+            --arg role "$role" \
+            '{kind: $kind, repository_id: $repository_id, event_id: $event_id,
+              episode: $episode[0].episode,
+              project_revision_sha256: $episode[0].project_revision_sha256,
+              actor: {id: $actor_id, login: $actor, role: $role}}' > event.json
+          cargo run --locked --quiet -- --transition \
+            --root . --event event.json --current episode.json > decision.json
+          action=$(jq -r '.action' decision.json)
+          echo "action=$action" >> "$GITHUB_OUTPUT"
+          echo "cleanup=$(jq -r '.cleanup_required' decision.json)" >> "$GITHUB_OUTPUT"
+          jq -r '"action=" + .action + " status=" + .authorization.status' decision.json
+          # An untrusted actor may only fail this gate. Nothing is written.
+          [ "$action" != "gate_failed" ] || { echo "::error::$KIND from $ACTOR is not authorized to end this episode"; exit 1; }
+
+      - name: Clean up the abandoned episode
+        if: steps.transition.outputs.cleanup == 'true'
+        env:
+          ISSUE: ${{ steps.episode.outputs.issue }}
+        run: |
+          set -euo pipefail
+          branch="autodev/issue-$ISSUE-gen$(jq -r '.episode.authorization_generation' episode.json)"
+          echo "releasing $branch"
+          pull=$(gh pr list --repo "$REPOSITORY" --head "$branch" --state open --json number --jq '.[0].number // ""')
+          if [ -n "$pull" ]; then
+            gh pr close "$pull" --repo "$REPOSITORY" --comment "Episode abandoned; closing without merge."
+          fi
+          gh api -X DELETE "repos/$REPOSITORY/git/refs/heads/$branch" > /dev/null 2>&1 || true
+          jq '.authorization' decision.json > cleaned-episode.json
+          jq --argjson event_id "$((RUN_ID * 10 + 5))" \
+            '.event_id = $event_id | .kind = "cleanup_completed"' event.json > cleanup-event.json
+          cargo run --locked --quiet -- --transition \
+            --root . --event cleanup-event.json --current cleaned-episode.json > decision.json
+          jq -r '"cleanup action=" + .action + " status=" + .authorization.status' decision.json
+
+      - name: Persist the record
+        if: steps.record.outputs.present == 'true' && (steps.merge.outcome == 'success' || steps.transition.outputs.action == 'updated')
+        env:
+          ISSUE: ${{ steps.episode.outputs.issue }}
+        run: |
+          set -euo pipefail
+          jq -s '.[0] + [.[1].authorization]
+                 | group_by(.episode.authorization_generation)
+                 | map(last)' prior.json decision.json > next.json
+          scripts/autodev-record-write.sh "$REPOSITORY" "$ISSUE" \
+            "${{ steps.record.outputs.comment_id }}" next.json
+          jq -r '.[] | "generation " + (.episode.authorization_generation | tostring) + ": " + .status' next.json

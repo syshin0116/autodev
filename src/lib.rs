@@ -563,7 +563,7 @@ pub struct DependencyStatus {
     pub merged_into: Option<String>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct VerifiedEvidence {
     pub task_sha256: String,
     pub project_revision_sha256: String,
@@ -756,6 +756,12 @@ pub enum CliCommand {
         event: PathBuf,
         current: PathBuf,
     },
+    CompleteMerge {
+        root: PathBuf,
+        current: PathBuf,
+        evidence: PathBuf,
+        merged_into: String,
+    },
 }
 
 /// Parses the delivery adapter's command line. The three original print
@@ -808,6 +814,17 @@ pub fn parse_cli(arguments: &[String]) -> Result<CliCommand> {
             options.finish()?;
             Ok(command)
         }
+        "--complete-merge" => {
+            let mut options = CliOptions::parse(rest, command)?;
+            let command = CliCommand::CompleteMerge {
+                root: options.path("root")?,
+                current: options.path("current")?,
+                evidence: options.path("evidence")?,
+                merged_into: options.text("merged-into")?,
+            };
+            options.finish()?;
+            Ok(command)
+        }
         unsupported if unsupported.starts_with("--") => Err(ValidationError::new(format!(
             "unsupported command: {unsupported}"
         ))),
@@ -856,6 +873,14 @@ impl CliOptions {
             .map(|value| value.trim().to_owned())
             .filter(|value| !value.is_empty())
             .map(PathBuf::from)
+    }
+
+    fn text(&mut self, name: &str) -> Result<String> {
+        self.values
+            .remove(name)
+            .map(|value| value.trim().to_owned())
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| ValidationError::new(format!("{} requires --{name}", self.command)))
     }
 
     fn issue(&mut self) -> Result<u64> {
