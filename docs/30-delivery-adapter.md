@@ -7,6 +7,7 @@ The first adapter turns one authorized issue into a draft pull request. GitHub d
 - [Authorization record](#authorization-record)
 - [Agent input](#agent-input)
 - [Dependencies](#dependencies)
+- [Questions](#questions)
 - [Running a delivery](#running-a-delivery)
 - [Not implemented yet](#not-implemented-yet)
 
@@ -27,13 +28,14 @@ Delivery therefore advances only while the operator runs the command. [ADR 0007]
 
 ## Ending an episode
 
-`autodev-transition.yml` ends episodes. It reacts to a merged or closed pull request, removal of the ready label, and issue closure, and decides every outcome through the Rust boundary.
+`autodev-transition.yml` ends episodes. It reacts to a merged or closed pull request, an edited issue, removal of the ready label, and issue closure, and decides every outcome through the Rust boundary.
 
 Pull request closure arrives as `pull_request_target` so the workflow definition always comes from the default branch, and the workflow never checks out or runs pull request code.
 
 - A merged pull request completes the episode as `merged`, which is absorbing. Completion requires the approved base branch and every required check passing on that pull request, so a merge that skipped the gates cannot claim success.
 - Closing the issue is also how a merge reports itself, so an issue closure is a no-op when the episode's branch already has a merged pull request. Success does not abandon itself.
 - Ready-label removal, issue closure, and closing the pull request unmerged abandon the episode when the actor holds a cancel role. Any other actor only fails that gate, and nothing is written.
+- An issue edit by an authorizer supersedes the episode. Cleanup then closes its pull request and deletes its branch, and reapplying `autodev:ready` records the replacement digests and starts the next generation in the same run.
 - Abandonment then runs cleanup: close the open pull request, delete the episode branch, and record `cleanup_completed`. Only after that can reapplying the ready label start the next authorization generation, which is what makes a failed episode retryable.
 
 Event identity is `run_id * 10 + kind`, so re-running a run replays one identity and becomes a no-op, while two kinds inside one run stay distinct.
@@ -58,6 +60,14 @@ A task issue's native blocking relationships are its dependencies. The runner re
 
 A dependency counts as complete only when its record reached the merged terminal state with the approved base branch. An authorized but unfinished dependency, and one nobody authorized at all, both get a status that fails the check, because the readiness rule requires exactly one status per declared dependency.
 
+## Questions
+
+When the engine cannot proceed without a decision the task does not contain, it writes `./.autodev-question.md` and changes nothing. The runner then records the suspension first, publishes the question as an issue comment, adds `autodev:needs-input`, and removes `autodev:ready` last. Every step is idempotent, so an interrupted run can be repeated.
+
+Removing the ready label is what would normally abandon an episode. The transition controller treats that removal as bookkeeping when the episode is already recorded as suspended, which is why the suspension is persisted before the label moves. A human who wants to cancel a suspended episode closes the issue instead.
+
+Answering means editing the issue body. That edit supersedes the episode, and reapplying `autodev:ready` starts the next generation against the new content.
+
 ## Running a delivery
 
 ```sh
@@ -74,7 +84,7 @@ Work happens in a scratch git worktree under the system temp directory, so the o
 These belong to the remaining verification bullets on the delivery and controller issues:
 
 - The repository-scoped delivery credential, the CI-trigger commit, `autodev/gate`, and the deterministic merge job. `autodev/gate` is deliberately absent from the base branch ruleset until something can publish it.
-- Questions and `autodev:needs-input`, review correction inside the correction budget, and the supersession path for an authorized task edit.
+- Review correction inside the correction budget. A failing pull request still needs a human to run the delivery command again.
 - Re-evaluating an already authorized blocked issue when its dependency merges. Today the operator runs the delivery command again.
 - Serialization between an issue event and a pull request event for the same episode. Their concurrency groups differ, so the library's event identity and status guards are what keep a racing pair from corrupting the record.
 - Durable per-attempt evidence outside the local engine log.

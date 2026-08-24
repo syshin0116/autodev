@@ -95,6 +95,7 @@ jobs:
           echo "comment_id=$(jq -r '.comment_id // ""' record.json)" >> "$GITHUB_OUTPUT"
 
       - name: Decide the authorization
+        id: decide
         run: |
           set -euo pipefail
           cargo run --locked --quiet -- --authorize \
@@ -102,6 +103,7 @@ jobs:
             --event ready-event.json \
             --agent-input agent-input.md \
             --prior prior.json > decision.json
+          echo "action=$(jq -r '.action' decision.json)" >> "$GITHUB_OUTPUT"
           jq -r '"action=" + .action' decision.json
 
       # Persisting the record before any side effect is what turns a duplicate
@@ -115,12 +117,39 @@ jobs:
           scripts/autodev-record-write.sh "$REPOSITORY" "$ISSUE" \
             "${{ steps.prior.outputs.comment_id }}" next.json
 
+      # A superseded episode whose cleanup already finished can start its
+      # replacement immediately: the replacement digests are recorded above, so
+      # the second decision is the one that opens generation two.
+      - name: Start the replacement of a superseded episode
+        id: replacement
+        if: steps.decide.outputs.action == 'supersession_required'
+        run: |
+          set -euo pipefail
+          if [ "$(jq -r '.authorization.cleanup_complete' decision.json)" != "true" ]; then
+            echo "::notice::the superseded episode still needs cleanup"
+            exit 0
+          fi
+          jq -s '.[0] + [.[1].authorization]
+                 | group_by(.episode.authorization_generation)
+                 | map(last)' prior.json decision.json > superseded.json
+          cargo run --locked --quiet -- --authorize \
+            --root . --issue "$ISSUE" \
+            --event ready-event.json \
+            --agent-input agent-input.md \
+            --prior superseded.json > decision.json
+          cp superseded.json prior.json
+          jq -r '"action=" + .action' decision.json
+
       # Delivery is not started here. The operator's runner claims the recorded
       # episode, so this step only reports whether the episode is claimable.
       - name: Report the decision
         run: |
           set -euo pipefail
           action=$(jq -r '.action' decision.json)
+          if [ "$action" = "supersession_required" ]; then
+            echo "::error::the previous episode must finish cleanup before this task can restart"
+            exit 1
+          fi
           if [ "$action" != "start" ] && [ "$action" != "replay" ]; then
             gh issue edit "$ISSUE" --repo "$REPOSITORY" --add-label "autodev:human-needed"
             echo "::error::authorization returned $action, which requires human judgment"

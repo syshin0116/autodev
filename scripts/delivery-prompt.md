@@ -27,4 +27,6 @@ The last command must print `Planning revision valid.` A failing check is not so
 
 ## Result
 
-Leave the change in the working tree and end with a short report: what changed, which verification bullets it satisfies, and which remain open. If you cannot satisfy the task without a decision that is not in the file, make no change and report which decision is missing.
+Leave the change in the working tree and end with a short report: what changed, which verification bullets it satisfies, and which remain open.
+
+If you cannot satisfy the task without a decision that is not in the file, make no change and write `./.autodev-question.md` containing one focused question, the options you see, and what each would mean. The runner publishes that file and suspends the task; nobody reads your transcript.
