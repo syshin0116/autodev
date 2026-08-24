@@ -124,3 +124,79 @@ fn an_empty_authorization_list_is_refused() {
     assert!(!output.status.success());
     fs::remove_dir_all(&temp).ok();
 }
+
+// The attempt record uses the same comment implementation under a different
+// marker and key, so the correction loop cannot invent a second format.
+#[test]
+fn any_marked_record_round_trips_under_its_own_key() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let temp = std::env::temp_dir().join(format!("autodev-attempts-{}", std::process::id()));
+    fs::create_dir_all(&temp).expect("temp dir");
+    let payload = temp.join("attempts.json");
+    let attempts = serde_json::json!([
+        {"authorization_generation": 1, "attempt": 1, "head": "abc", "failure_signature": "def"}
+    ]);
+    fs::write(
+        &payload,
+        serde_json::to_vec_pretty(&attempts).expect("serialize"),
+    )
+    .expect("write attempts");
+
+    let body = Command::new(root.join("scripts/autodev-comment-record.sh"))
+        .args(["write", "owner/repo", "16", ""])
+        .args(["<!-- autodev:attempts -->"])
+        .arg(&payload)
+        .env("AUTODEV_RECORD_DRY_RUN", "1")
+        .output()
+        .expect("render the attempts comment");
+    assert!(
+        body.status.success(),
+        "{}",
+        String::from_utf8_lossy(&body.stderr)
+    );
+
+    let comments = temp.join("comments.json");
+    let page = serde_json::json!([[{
+        "id": 7,
+        "body": String::from_utf8(body.stdout).expect("utf-8 body")
+    }]]);
+    fs::write(&comments, serde_json::to_vec(&page).expect("serialize")).expect("write comments");
+
+    let read = Command::new(root.join("scripts/autodev-comment-record.sh"))
+        .args([
+            "read",
+            "owner/repo",
+            "16",
+            "<!-- autodev:attempts -->",
+            "attempts",
+        ])
+        .env("AUTODEV_COMMENTS_FILE", &comments)
+        .output()
+        .expect("read the attempts record");
+    assert!(
+        read.status.success(),
+        "{}",
+        String::from_utf8_lossy(&read.stderr)
+    );
+    let record: serde_json::Value = serde_json::from_slice(&read.stdout).expect("json");
+    assert_eq!(record["comment_id"], 7);
+    assert_eq!(record["attempts"], attempts);
+
+    // A marker that is not present must not pick up the other record.
+    let other = Command::new(root.join("scripts/autodev-comment-record.sh"))
+        .args([
+            "read",
+            "owner/repo",
+            "16",
+            "<!-- autodev:authorization -->",
+            "authorizations",
+        ])
+        .env("AUTODEV_COMMENTS_FILE", &comments)
+        .output()
+        .expect("read the authorization record");
+    let other: serde_json::Value = serde_json::from_slice(&other.stdout).expect("json");
+    assert!(other["comment_id"].is_null());
+    assert_eq!(other["authorizations"].as_array().expect("array").len(), 0);
+
+    fs::remove_dir_all(&temp).ok();
+}

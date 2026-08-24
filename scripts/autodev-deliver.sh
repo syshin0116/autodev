@@ -108,20 +108,80 @@ branch="autodev/issue-$issue-gen$generation"
 if git show-ref --quiet "refs/heads/$branch"; then
   fail "$branch already exists locally; remove it before claiming this episode again"
 fi
-if [ -n "$(gh pr list --repo "$repository" --head "$branch" --state open --json number --jq '.[].number')" ]; then
-  fail "$branch already has an open pull request; the correction loop is not implemented yet"
+
+# An open pull request means this episode already delivered once, so the run
+# becomes a correction against the failure its current head reports.
+pull=$(gh pr list --repo "$repository" --head "$branch" --state open \
+  --json number,headRefOid --jq '.[0] // empty')
+correction=false
+if [ -n "$pull" ]; then
+  correction=true
+  pull_number=$(jq -r '.number' <<< "$pull")
+  head=$(jq -r '.headRefOid' <<< "$pull")
+  failing=$(gh pr checks "$pull_number" --repo "$repository" --json name,state \
+    --jq '[.[] | select(.state == "FAILURE" or .state == "ERROR" or .state == "TIMED_OUT" or .state == "CANCELLED") | .name] | sort | join(",")')
+  [ -n "$failing" ] || { echo "pull request #$pull_number has no failing check to correct."; exit 0; }
+  signature=$(printf '%s' "$failing" | shasum -a 256 | cut -d' ' -f1)
+  budget=$(cargo run --locked --quiet -- --print-project-revision . \
+    | jq -r '.projection.delivery.correction_budget')
+  scripts/autodev-comment-record.sh read "$repository" "$issue" \
+    '<!-- autodev:attempts -->' attempts > "$work/attempts.json"
+  used=$(jq --argjson g "$generation" \
+    '[.attempts[] | select(.authorization_generation == $g)] | length' "$work/attempts.json")
+  if [ "$used" -ge "$budget" ]; then
+    gh issue edit "$issue" --repo "$repository" --add-label "autodev:human-needed" > /dev/null
+    fail "correction budget of $budget is exhausted for generation $generation"
+  fi
+  repeated=$(jq -r --argjson g "$generation" --arg head "$head" --arg signature "$signature" \
+    '[.attempts[] | select(.authorization_generation == $g)] | last
+     | if . != null and .head == $head and .failure_signature == $signature then "true" else "false" end' \
+    "$work/attempts.json")
+  if [ "$repeated" = "true" ]; then
+    gh issue edit "$issue" --repo "$repository" --add-label "autodev:human-needed" > /dev/null
+    fail "the same failure repeated on an unchanged head; a correction would make no progress"
+  fi
+  echo "Correcting pull request #$pull_number, attempt $((used + 1)) of $budget, failing: $failing"
 fi
 
 git fetch --quiet origin
-git worktree add --quiet -b "$branch" "$tree" "origin/$base"
+if [ "$correction" = true ]; then
+  git worktree add --quiet -b "$branch" "$tree" "origin/$branch"
+  {
+    echo "# Failing checks"
+    printf '%s' "$failing" | tr ',' '\n' | sed 's/^/- /'
+    echo
+    echo "# Log tail"
+    run=$(gh run list --repo "$repository" --branch "$branch" --limit 1 --json databaseId --jq '.[0].databaseId // ""')
+    [ -z "$run" ] || gh run view "$run" --repo "$repository" --log-failed 2> /dev/null | tail -120
+  } > "$tree/.autodev-failure.md"
+else
+  git worktree add --quiet -b "$branch" "$tree" "origin/$base"
+fi
 cp "$work/agent-input.md" "$tree/.autodev-task.md"
 {
   echo ".autodev-task.md"
   echo ".autodev-question.md"
+  echo ".autodev-failure.md"
 } >> "$(git -C "$tree" rev-parse --git-path info/exclude)"
 
+prompt="$root/scripts/delivery-prompt.md"
+if [ "$correction" = true ]; then
+  prompt="$root/scripts/correction-prompt.md"
+  if [ "$apply" = true ]; then
+    # Recorded before the engine runs, so a crashed attempt still counts and
+    # the budget cannot be spent in a loop.
+    jq --argjson g "$generation" --argjson attempt "$((used + 1))" \
+      --arg head "$head" --arg signature "$signature" \
+      '.attempts + [{authorization_generation: $g, attempt: $attempt, head: $head, failure_signature: $signature}]' \
+      "$work/attempts.json" > "$work/next-attempts.json"
+    scripts/autodev-comment-record.sh write "$repository" "$issue" \
+      "$(jq -r '.comment_id // ""' "$work/attempts.json")" \
+      '<!-- autodev:attempts -->' "$work/next-attempts.json"
+  fi
+fi
+
 echo "Running the engine for issue #$issue, generation $generation."
-codex exec --sandbox workspace-write --cd "$tree" "$(cat "$root/scripts/delivery-prompt.md")" \
+codex exec --sandbox workspace-write --cd "$tree" "$(cat "$prompt")" \
   2>&1 | tee "$work/engine.log"
 
 # A missing decision suspends the episode instead of guessing. The suspension
@@ -190,7 +250,11 @@ BODY
 
 if [ "$apply" != true ]; then
   echo
-  echo "Would push branch: $branch"
+  if [ "$correction" = true ]; then
+    echo "Would push the correction to: $branch"
+  else
+    echo "Would push branch: $branch"
+  fi
   echo "Would open a draft pull request titled: $title"
   printf '%s\n' "$changed" | sed 's/^/  changed: /'
   echo "Re-run with --apply to perform these writes."
@@ -198,8 +262,17 @@ if [ "$apply" != true ]; then
 fi
 
 git -C "$tree" add -A
-git -C "$tree" commit --quiet -m "$title" -m "Authorized issue #$issue, generation $generation."
+if [ "$correction" = true ]; then
+  git -C "$tree" commit --quiet -m "Correct $title" \
+    -m "Attempt $((used + 1)) for issue #$issue, generation $generation, against $failing."
+else
+  git -C "$tree" commit --quiet -m "$title" -m "Authorized issue #$issue, generation $generation."
+fi
 git -C "$tree" push --quiet -u origin "$branch"
 pushed=true
-gh pr create --repo "$repository" --base main --head "$branch" --draft \
-  --title "$title" --body-file "$work/pr-body.md"
+if [ "$correction" = true ]; then
+  echo "Updated pull request #$pull_number."
+else
+  gh pr create --repo "$repository" --base "$base" --head "$branch" --draft \
+    --title "$title" --body-file "$work/pr-body.md"
+fi
