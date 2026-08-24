@@ -84,6 +84,24 @@ scripts/autodev-agent-input.sh "$work/snapshot.json" "$association" > "$work/age
 [ "$(digest "$work/agent-input.md")" = "$(jq -r '.agent_input_sha256' "$work/episode.json")" ] \
   || fail "the agent input no longer matches the authorized digest"
 
+base=$(cargo run --locked --quiet -- --print-project-revision . \
+  | jq -r '.projection.delivery.base_branch')
+
+# A dependency releases this task only when its own episode reached the merged
+# terminal state, so an unfinished predecessor blocks instead of racing.
+if [ "$(jq '.task_snapshot.projection.blocked_by | length' "$work/snapshot.json")" != "0" ]; then
+  scripts/autodev-dependency-status.sh "$repository" "$work/snapshot.json" "$base" > "$work/dependencies.json"
+  ready=$(cargo run --locked --quiet -- --dependencies-ready \
+    --root . --issue "$issue" --statuses "$work/dependencies.json" | jq -r '.ready')
+  if [ "$ready" != "true" ]; then
+    jq -r '.[] | select(.evidence_verified | not) | "incomplete dependency: " + .issue_node_id' \
+      "$work/dependencies.json" >&2
+    gh issue edit "$issue" --repo "$repository" --add-label "autodev:blocked" > /dev/null
+    fail "issue #$issue is blocked by an incomplete dependency"
+  fi
+  gh issue edit "$issue" --repo "$repository" --remove-label "autodev:blocked" > /dev/null 2>&1 || true
+fi
+
 branch="autodev/issue-$issue-gen$generation"
 if git show-ref --quiet "refs/heads/$branch"; then
   fail "$branch already exists locally; remove it before claiming this episode again"
@@ -93,7 +111,7 @@ if [ -n "$(gh pr list --repo "$repository" --head "$branch" --state open --json 
 fi
 
 git fetch --quiet origin
-git worktree add --quiet -b "$branch" "$tree" origin/main
+git worktree add --quiet -b "$branch" "$tree" "origin/$base"
 cp "$work/agent-input.md" "$tree/.autodev-task.md"
 echo ".autodev-task.md" >> "$(git -C "$tree" rev-parse --git-path info/exclude)"
 

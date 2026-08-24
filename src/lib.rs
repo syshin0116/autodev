@@ -550,7 +550,8 @@ pub struct TransitionDecision {
     pub cleanup_required: bool,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
 pub struct DependencyStatus {
     pub issue_node_id: String,
     pub approved_task_sha256: Option<String>,
@@ -762,6 +763,11 @@ pub enum CliCommand {
         evidence: PathBuf,
         merged_into: String,
     },
+    DependenciesReady {
+        root: PathBuf,
+        issue: u64,
+        statuses: PathBuf,
+    },
 }
 
 /// Parses the delivery adapter's command line. The three original print
@@ -821,6 +827,16 @@ pub fn parse_cli(arguments: &[String]) -> Result<CliCommand> {
                 current: options.path("current")?,
                 evidence: options.path("evidence")?,
                 merged_into: options.text("merged-into")?,
+            };
+            options.finish()?;
+            Ok(command)
+        }
+        "--dependencies-ready" => {
+            let mut options = CliOptions::parse(rest, command)?;
+            let command = CliCommand::DependenciesReady {
+                root: options.path("root")?,
+                issue: options.issue()?,
+                statuses: options.path("statuses")?,
             };
             options.finish()?;
             Ok(command)
