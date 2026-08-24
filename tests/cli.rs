@@ -204,6 +204,30 @@ fn merge_completion_names_the_branch_it_merged_into() {
 }
 
 #[test]
+fn a_dependency_check_names_the_task_and_its_statuses() {
+    assert_eq!(
+        parse(&[
+            "--dependencies-ready",
+            "--root",
+            ".",
+            "--issue",
+            "8",
+            "--statuses",
+            "statuses.json",
+        ]),
+        CliCommand::DependenciesReady {
+            root: PathBuf::from("."),
+            issue: 8,
+            statuses: PathBuf::from("statuses.json"),
+        }
+    );
+    assert_eq!(
+        error(&["--dependencies-ready", "--root", ".", "--issue", "8"]),
+        "--dependencies-ready requires --statuses"
+    );
+}
+
+#[test]
 fn malformed_options_are_rejected_instead_of_ignored() {
     assert_eq!(
         error(&["--transition", "--root", ".", "--event"]),

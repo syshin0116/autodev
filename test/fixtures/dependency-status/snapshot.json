@@ -1,0 +1,27 @@
+{
+  "project_revision": {
+    "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "task_snapshot": {
+    "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "projection": {
+      "blocked_by": [
+        {
+          "issue_id": 1,
+          "issue_node_id": "I_five",
+          "issue_number": 5
+        },
+        {
+          "issue_id": 2,
+          "issue_node_id": "I_six",
+          "issue_number": 6
+        },
+        {
+          "issue_id": 3,
+          "issue_node_id": "I_seven",
+          "issue_number": 7
+        }
+      ]
+    }
+  }
+}

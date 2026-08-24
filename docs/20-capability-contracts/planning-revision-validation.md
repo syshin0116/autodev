@@ -182,6 +182,13 @@ cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- \
   --evidence <evidence.json> --merged-into <branch>
 ```
 
+Check whether one task's dependencies are complete. `--statuses` is one status per declared dependency:
+
+```sh
+cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- \
+  --dependencies-ready --root <project-root> --issue <number> --statuses <statuses.json>
+```
+
 The printed record is the next durable state. Persist it before any side effect, then supply it as `--prior` or `--current` on the following decision. Replaying the same event identity returns a no-op rather than a second episode.
 
 ## Result

@@ -17,6 +17,9 @@ export STATE_MARKER='<!-- autodev:authorization -->'
 # --slurp cannot be combined with --jq, so the filter runs in a separate jq.
 if [ -n "${AUTODEV_COMMENTS_FILE:-}" ]; then
   cat "$AUTODEV_COMMENTS_FILE"
+elif [ -n "${AUTODEV_COMMENTS_DIR:-}" ]; then
+  # Per-issue seam, used when one caller reads several issues in a row.
+  cat "$AUTODEV_COMMENTS_DIR/$issue.json" 2> /dev/null || echo '[[]]'
 else
   gh api "repos/$repository/issues/$issue/comments" --paginate --slurp
 fi > /tmp/autodev-comments.$$.json

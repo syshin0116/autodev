@@ -6,6 +6,7 @@ The first adapter turns one authorized issue into a draft pull request. GitHub d
 - [Ending an episode](#ending-an-episode)
 - [Authorization record](#authorization-record)
 - [Agent input](#agent-input)
+- [Dependencies](#dependencies)
 - [Running a delivery](#running-a-delivery)
 - [Not implemented yet](#not-implemented-yet)
 
@@ -51,6 +52,12 @@ The comment is a carrier, not authority. It holds no approval-bound planning con
 
 The controller and the runner both call that script, so the runner can compare its rebuild against the recorded `agent_input_sha256`. Changing the script's output changes that digest and invalidates every in-flight episode. `tests/agent_input.rs` pins the output.
 
+## Dependencies
+
+A task issue's native blocking relationships are its dependencies. The runner refuses to start while any of them is incomplete, and labels the issue `autodev:blocked`. The label is a report, not the state: `scripts/autodev-dependency-status.sh` derives each dependency's status from that dependency's own authorization record, so a hand-applied or hand-removed label changes nothing.
+
+A dependency counts as complete only when its record reached the merged terminal state with the approved base branch. An authorized but unfinished dependency, and one nobody authorized at all, both get a status that fails the check, because the readiness rule requires exactly one status per declared dependency.
+
 ## Running a delivery
 
 ```sh
@@ -67,7 +74,8 @@ Work happens in a scratch git worktree under the system temp directory, so the o
 These belong to the remaining verification bullets on the delivery and controller issues:
 
 - The repository-scoped delivery credential, the CI-trigger commit, `autodev/gate`, and the deterministic merge job. `autodev/gate` is deliberately absent from the base branch ruleset until something can publish it.
-- Dependency blocking, questions and `autodev:needs-input`, review correction inside the correction budget, and the supersession path for an authorized task edit.
+- Questions and `autodev:needs-input`, review correction inside the correction budget, and the supersession path for an authorized task edit.
+- Re-evaluating an already authorized blocked issue when its dependency merges. Today the operator runs the delivery command again.
 - Serialization between an issue event and a pull request event for the same episode. Their concurrency groups differ, so the library's event identity and status guards are what keep a racing pair from corrupting the record.
 - Durable per-attempt evidence outside the local engine log.
 - Deriving the protected paths from the approved project revision instead of hard-coding them in the runner.
