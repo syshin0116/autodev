@@ -8,6 +8,7 @@ The first adapter turns one authorized issue into a draft pull request. GitHub d
 - [Agent input](#agent-input)
 - [Dependencies](#dependencies)
 - [Questions](#questions)
+- [Corrections](#corrections)
 - [Running a delivery](#running-a-delivery)
 - [Not implemented yet](#not-implemented-yet)
 
@@ -44,7 +45,7 @@ Event identity is `run_id * 10 + kind`, so re-running a run replays one identity
 
 The durable record is one comment on the issue, marked with `<!-- autodev:authorization -->` and carrying a JSON array of authorization records in a fenced block. The controller upserts it and keeps the latest record per authorization generation.
 
-`scripts/autodev-record-write.sh` is the only writer of that comment and `scripts/autodev-episode-record.sh` is the only reader, shared by both controllers and the runner, and `tests/episode_record.rs` covers a writer to reader round trip, a record on a later comment page, an issue with no record, and a damaged record that must fail instead of looking like a first authorization.
+`scripts/autodev-comment-record.sh` reads and writes every marked state comment, including the attempt record, with `scripts/autodev-episode-record.sh` and `scripts/autodev-record-write.sh` as the authorization-record wrappers used by both controllers and the runner, and `tests/episode_record.rs` covers a writer to reader round trip, a record on a later comment page, an issue with no record, and a damaged record that must fail instead of looking like a first authorization.
 
 The comment is a carrier, not authority. It holds no approval-bound planning content, so editing it cannot change what was approved; a tampered record produces a decision that fails its own gate. Per-issue serialization comes from the workflow concurrency group `autodev-episode-<issue>`, which never cancels a run in progress.
 
@@ -68,6 +69,20 @@ Removing the ready label is what would normally abandon an episode. The transiti
 
 Answering means editing the issue body. That edit supersedes the episode, and reapplying `autodev:ready` starts the next generation against the new content.
 
+## Corrections
+
+When the episode's branch already has an open pull request, the run becomes a correction instead of a second delivery. The runner reads the pull request's failing checks, builds `.autodev-failure.md` from their names and the failed job's log tail, and runs the engine with the correction prompt against the existing branch.
+
+Three things stop it, each recorded rather than inferred:
+
+- the approved correction budget for that authorization generation is spent
+- the same normalized failure signature appears again on an unchanged head, which means the last attempt made no progress
+- no check is failing, in which case there is nothing to correct
+
+The first two label the issue `autodev:human-needed`. Attempt count, head, and failure signature live in a separate `<!-- autodev:attempts -->` comment, written before the engine runs so a crashed attempt still counts and the budget cannot be spent in a loop.
+
+Only a newly authorized task snapshot resets the budget, because attempts are keyed by authorization generation.
+
 ## Running a delivery
 
 ```sh
@@ -84,7 +99,8 @@ Work happens in a scratch git worktree under the system temp directory, so the o
 These belong to the remaining verification bullets on the delivery and controller issues:
 
 - The repository-scoped delivery credential, the CI-trigger commit, `autodev/gate`, and the deterministic merge job. `autodev/gate` is deliberately absent from the base branch ruleset until something can publish it.
-- Review correction inside the correction budget. A failing pull request still needs a human to run the delivery command again.
+- Reacting to review comments. Only failing checks drive a correction today.
+- Starting a correction automatically. The operator runs the delivery command again, which is the same boundary as the first delivery.
 - Re-evaluating an already authorized blocked issue when its dependency merges. Today the operator runs the delivery command again.
 - Serialization between an issue event and a pull request event for the same episode. Their concurrency groups differ, so the library's event identity and status guards are what keep a racing pair from corrupting the record.
 - Durable per-attempt evidence outside the local engine log.
