@@ -782,6 +782,15 @@ fn episode_transitions_require_the_bound_roles_and_keep_merge_terminal() {
     let merged = complete_episode_merge(&project, &authorization, &evidence, "main")
         .expect("merge transition");
     assert_eq!(merged.authorization.status, EpisodeStatus::Merged);
+    let replay = complete_episode_merge(&project, &merged.authorization, &evidence, "main")
+        .expect("merge replay");
+    assert_eq!(replay.action, TransitionAction::NoOp);
+    assert_eq!(replay.authorization, merged.authorization);
+    let mismatched = VerifiedEvidence {
+        authorization_generation: evidence.authorization_generation + 1,
+        ..evidence.clone()
+    };
+    assert!(complete_episode_merge(&project, &merged.authorization, &mismatched, "main").is_err());
     let after_close = transition_rootless_episode(
         &project,
         &merged.authorization,

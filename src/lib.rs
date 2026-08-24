@@ -1336,7 +1336,10 @@ pub fn complete_episode_merge(
 ) -> Result<TransitionDecision> {
     validate_project_revision_integrity(project_revision)?;
     if current.project_revision_sha256 != project_revision.sha256
-        || current.status != EpisodeStatus::Active
+        || !matches!(
+            current.status,
+            EpisodeStatus::Active | EpisodeStatus::Merged
+        )
         || !evidence.verified
         || evidence.task_sha256 != current.episode.task_sha256
         || evidence.project_revision_sha256 != current.project_revision_sha256
@@ -1345,6 +1348,15 @@ pub fn complete_episode_merge(
     {
         return Err(ValidationError::new(
             "merge completion requires active authorization, verified evidence, and the approved base branch",
+        ));
+    }
+    // Merged is absorbing, so replaying the same merge event is a no-op rather
+    // than an error. The evidence above must still match the episode.
+    if current.status == EpisodeStatus::Merged {
+        return Ok(transition_decision(
+            TransitionAction::NoOp,
+            current.clone(),
+            false,
         ));
     }
     let mut next = current.clone();
