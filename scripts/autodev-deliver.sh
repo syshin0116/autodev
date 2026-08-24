@@ -17,6 +17,15 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --issue) issue=${2:?issue number}; shift 2 ;;
     --apply) apply=true; shift ;;
+    --help)
+      printf '%s\n' \
+        "Usage: scripts/autodev-deliver.sh --issue <number> [--apply]" \
+        "" \
+        "  --issue <number>  Claim the authorized episode for this issue." \
+        "  --apply           Required to push a branch or open a pull request." \
+        "  --help            Print this usage."
+      exit 0
+      ;;
     *) echo "unsupported option: $1" >&2; exit 2 ;;
   esac
 done
