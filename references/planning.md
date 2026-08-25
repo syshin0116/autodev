@@ -10,19 +10,21 @@ Before asking a setup question or writing a file, inspect only the target projec
 
 - Resolve the project root from the selected workspace or explicit target.
 - Inspect existing project documentation, local task files, Autodev state, and Git remote metadata. Do not scan outside the project for Knowledge.
+- Inspect project-scoped Agent Host configuration and instructions for an established Kaneo MCP server and exact workspace/project mapping. Verify that mapping through the connected Kaneo tools before selecting it.
 - Use an existing `docs/project-overview.md` as the Overview entry point. When project documentation clearly lives under `docs/` but the entry point is absent, use that path for the Overview that Planning will create later. Ask where it belongs only when the repository establishes another documentation location or the choice is ambiguous.
 - Select an existing local task file only when there is one clear candidate. If local tasks are selected and no candidate exists, use `docs/tasks.yaml` when `docs/` is the established project documentation directory. A GitHub remote identifies the repository after GitHub Issues is selected, but does not itself select GitHub Issues as the task source.
 
 Ask only for choices that cannot be established from the repository or the request:
 
-- local task file or GitHub Issues when no task source is already established
+- local task file, GitHub Issues, or Kaneo when no task source is already established
 - the exact local task path when multiple candidates exist or no project documentation directory is established
 - the GitHub repository when the selected task source is GitHub Issues and the remote is absent or ambiguous
+- the Kaneo workspace and project when Kaneo is selected and the project does not already identify one exact mapping
 - selected Markdown Knowledge Roots, or explicit permission to continue without prior Knowledge
 
 Show the inferred and user-selected settings together, then write only `.autodev/config.yaml`. Do not create an Overview, Task Graph, Approval Record, or evidence during setup. Continue directly into the planning interview, where missing planning artifacts may be created from the templates.
 
-Use the configured `project_overview` and exactly one task source. `task_graph` selects the local file shape. `task_source.type: github_issues` selects one repository. A configured `root_issue` preserves the rooted Issue Graph shape for existing projects. Without it, each Issue is an independently authorized task. Never treat more than one source as active.
+Use the configured `project_overview` and exactly one task source. `task_graph` selects the local file shape. `task_source.type: github_issues` selects one repository. A configured `root_issue` preserves the rooted Issue Graph shape for existing projects. Without it, each Issue is an independently authorized task. `task_source.type: kaneo` selects one MCP server, workspace, and project as described in [Kaneo](kaneo.md). Never treat more than one source as active.
 
 Resolve configured external paths from the project root unless they are absolute. Treat `knowledge_roots` as the complete set of Markdown directories selected for this project. Never scan an unselected directory. Keep selected roots read-only. Treat a root supplied for one run as session-only unless it is already configured or the user asks to persist it. Do not write a sensitive local path into a tracked project file.
 
@@ -54,16 +56,17 @@ Group a manageable set of tightly related questions, do not repeat resolved ques
 
 ## Write the planning revision
 
-Use `templates/project/docs/project-overview.md` for the Overview. For a local task source, use `templates/project/tasks.yaml`. Each GitHub task body contains `Outcome`, `Planning references`, and `Verification` sections. Use plain bullets. A rooted source uses one non-executable root issue and recursive sub-issues. A rootless source uses ordinary issues and native blocking relationships without requiring a complete root graph.
+Use `templates/project/docs/project-overview.md` for the Overview. For a local task source, use `templates/project/tasks.yaml`. Each GitHub Issue or Kaneo task description contains `Outcome`, `Planning references`, and `Verification` sections. Use plain bullets. A rooted GitHub source uses one non-executable root issue and recursive sub-issues. A rootless GitHub source uses ordinary issues and native blocking relationships without requiring a complete root graph. Kaneo uses tasks in the configured project and native `blocks` relations.
 
 - Keep only information that changes a decision, action, constraint, or verification result.
 - Keep the Overview canonical. Add an ADR only when alternatives and rationale will matter later.
 - Keep `.autodev/approval.yaml` `pending` while drafting. It is the sole project-revision approval authority.
 - Set `Open questions` to `None.` only after material questions are resolved.
 - Derive tasks from verifiable outcomes. Include dependencies, local planning references, and concrete checks, but leave execution tactics to the Agent Host. For rooted GitHub, use native sub-issues for membership and order. For every GitHub source, use native blocking relationships for dependencies. A configured repository is not write permission; confirm the target through the user or the Host's normal authorization boundary before creating or changing Issues.
+- For Kaneo, show the complete proposed task set and exact mapped project before creating or changing tasks. After authorization, create tasks and `blocks` relations through the existing MCP connection, then read a fresh complete projection using [Kaneo](kaneo.md).
 - Put external knowledge citations in the Overview. Task references must resolve inside the project.
 
-Show the complete Overview and Task Graph, or their complete diff when revising existing artifacts. For rooted GitHub, show the complete Issue Graph projection and digest. For rootless GitHub, show the complete project-revision projection and digest. Use the entry points in `docs/10-runtime-mapping.md` relative to the Autodev Skill root. Ask separately whether the user approves that exact project revision. Rootless approval does not authorize any Issue. Never infer approval from the initial request, silence, or an earlier acknowledgment.
+Show the complete Overview and Task Graph, or their complete diff when revising existing artifacts. For rooted GitHub, show the complete Issue Graph projection and digest. For rootless GitHub, show the complete project-revision projection and digest. For Kaneo, show the canonical task projection and digest created from a fresh MCP read. Use the entry points in `docs/10-runtime-mapping.md` relative to the Autodev Skill root. Ask separately whether the user approves that exact project revision. Rootless GitHub approval does not authorize any Issue. Never infer approval from the initial request, silence, or an earlier acknowledgment.
 
 ## Record explicit approval
 
@@ -74,7 +77,8 @@ Only after an unambiguous answer to the approval question:
 3. For rooted GitHub, record a `planning_revision` containing the Overview path and byte digest plus the configured repository, root issue, and printed Issue Graph projection digest.
 4. For rootless GitHub, record the Overview path and byte digest plus the printed project-revision projection digest. That projection contains the Overview identity, Task Source repository identity, and semantic project configuration. Do not bind any Issue to project approval.
 5. Do not include current Issue state, applied-label membership, assignees, or comments in either project revision.
-6. Run the Planning Revision Validation capability using the entry point in `docs/10-runtime-mapping.md` relative to the Autodev Skill root.
-7. Stop before executing any task.
+6. For Kaneo, record the configured server, workspace, project, and printed task-projection digest. Do not include task status, priority, assignee, dates, comments, or labels.
+7. Run the Planning Revision Validation capability using the entry point in `docs/10-runtime-mapping.md` relative to the Autodev Skill root.
+8. Stop before executing any task.
 
-Any later local byte change, rooted Issue Graph projection change, or rootless project projection change invalidates the recorded approval. In rootless mode, an Issue edit invalidates only that Issue's authorization. Return project approval to pending only when the project revision changes. Reopen the interview when the change is material, show the exact revision or diff, and request approval again. Never refresh approval hashes to conceal a changed plan.
+Any later local byte change, rooted Issue Graph projection change, Kaneo Task Graph projection change, or rootless project projection change invalidates the recorded approval. In rootless GitHub mode, an Issue edit invalidates only that Issue's authorization. Return project approval to pending only when the project revision changes. Reopen the interview when the change is material, show the exact revision or diff, and request approval again. Never refresh approval hashes to conceal a changed plan.

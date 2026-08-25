@@ -34,6 +34,33 @@ task_source:
 
 Local approval uses the existing `files` mapping and binds the exact Overview and Task Graph bytes. An optional `required_planning_transition.after_task` must name a task in that graph.
 
+### Kaneo task source
+
+Kaneo selects one existing Agent Host MCP connection and one exact project:
+
+```yaml
+task_source:
+  type: kaneo
+  server: https://cloud.kaneo.app/api/mcp
+  workspace_id: WORKSPACE_ID
+  project_id: PROJECT_ID
+```
+
+The Host supplies a fresh complete JSON projection input from Kaneo. The validator binds task ID, number, project, title, description, and `blocks`, `subtask`, and `related` relations. It excludes status, priority, assignee, dates, comments, and labels. The input is temporary and never becomes a second Task System of Record.
+
+```yaml
+planning_revision:
+  project_overview:
+    path: docs/project-overview.md
+    sha256: <digest>
+  task_source:
+    type: kaneo
+    server: https://cloud.kaneo.app/api/mcp
+    workspace_id: WORKSPACE_ID
+    project_id: PROJECT_ID
+    sha256: <projection-digest>
+```
+
 ### Rooted GitHub Issues task source
 
 Existing rooted projects remain supported:
@@ -107,6 +134,8 @@ Every source requires:
 
 A local Task Graph also requires non-empty unique task IDs, titles, outcomes, verification checks, valid project-relative references, known dependencies, and no dependency cycle.
 
+A Kaneo Task Graph also requires a complete project read, non-empty unique task IDs and numbers, project membership for every task and relation endpoint, the three task-description sections, valid project-relative references, supported relation types, and no `blocks` cycle. Response order and duplicate relation reads do not change its digest.
+
 A rooted GitHub Issue Graph also requires:
 
 - complete paginated reads of the root, recursive sub-issues, and both dependency directions
@@ -146,6 +175,20 @@ Validate approval and print the exact rooted GitHub snapshot to use for executio
 
 ```sh
 cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- --print-validated-task-projection <project-root>
+```
+
+Print a canonical Kaneo Task Graph projection and SHA-256 from a fresh MCP read:
+
+```sh
+cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- \
+  --print-kaneo-task-projection --root <project-root> --input <temporary-json>
+```
+
+Validate the approved Kaneo projection before and after task work:
+
+```sh
+cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- \
+  --validate-kaneo-task-projection --root <project-root> --input <temporary-json>
 ```
 
 ### Rootless delivery decisions
@@ -193,4 +236,4 @@ The printed record is the next durable state. Persist it before any side effect,
 
 ## Result
 
-Success means only that the declared project plan is closed, structurally valid, readable, and identical to the approval record. Rooted execution uses the Issue Graph projection returned by that validation call. A trusted Host-side adapter uses the Rust library boundary to retain a rootless raw task snapshot outside Agent input, then passes only integrity-filtered input and the two digests onward. Any incomplete GitHub read, API error, malformed response, or digest mismatch fails closed without modifying project files.
+Success means only that the declared project plan is closed, structurally valid, readable, and identical to the approval record. Rooted GitHub and Kaneo execution use the Task Graph projection returned by validation. A trusted Host-side adapter uses the Rust library boundary to retain a rootless GitHub raw task snapshot outside Agent input, then passes only integrity-filtered input and the two digests onward. Any incomplete external read, API error, malformed response, or digest mismatch fails closed without modifying project files.

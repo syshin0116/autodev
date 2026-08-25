@@ -54,6 +54,7 @@ rough idea + selected Markdown knowledge
 - Rust 1.85+ and Cargo
 - An Agent Host with local Skill support
 - Optional: authenticated GitHub CLI (`gh`) for a GitHub Issues task source
+- Optional: a project-scoped, authenticated Kaneo MCP connection for a Kaneo task source
 
 ### Install in Codex
 
@@ -88,7 +89,7 @@ Autodev revalidates the revision, executes and verifies one ready task through t
 |---|---|
 | [`SKILL.md`](SKILL.md) and [`references/`](references/) | Phase routing plus planning, execution, and learning workflows |
 | `docs/project-overview.md` | Canonical project intent, decisions, scope, and success criteria |
-| `tasks.yaml` or GitHub Issues | Approval-bound outcomes, dependencies, references, and checks |
+| `tasks.yaml`, GitHub Issues, or Kaneo | Approval-bound outcomes, dependencies, references, and checks |
 | `.autodev/config.yaml` | Project paths and selected task source |
 | `.autodev/approval.yaml` | Approver metadata and exact planning revision digests |
 | `evidence/` | Verified task results without mutating the approved plan |
@@ -101,7 +102,7 @@ cargo run --locked --quiet \
   -- /absolute/path/to/project
 ```
 
-A valid revision prints `Planning revision valid.` GitHub projection commands and failure conditions are documented in [Planning Revision Validation](docs/20-capability-contracts/planning-revision-validation.md).
+A valid revision prints `Planning revision valid.` Kaneo uses its fresh-projection validation command instead of the positional command above. External task projection commands and failure conditions are documented in [Planning Revision Validation](docs/20-capability-contracts/planning-revision-validation.md).
 
 ## Read the design
 
@@ -110,8 +111,8 @@ A valid revision prints `Planning revision valid.` GitHub projection commands an
 | [Project Overview](docs/project-overview.md) | Goal, boundaries, current decisions, and proposed work |
 | [Autodev Skill](SKILL.md) | Host-facing phase router and shared boundaries |
 | [Phase guides](references/) | Planning, execution, and learning behavior loaded when needed |
-| [Planning Revision Validation](docs/20-capability-contracts/planning-revision-validation.md) | Local and GitHub task-source validation contract |
-| [Runtime Mapping](docs/10-runtime-mapping.md) | Capability to Rust and GitHub CLI mapping |
+| [Planning Revision Validation](docs/20-capability-contracts/planning-revision-validation.md) | Local, GitHub, and Kaneo task-source validation contract |
+| [Runtime Mapping](docs/10-runtime-mapping.md) | Capability to concrete tool mapping |
 | [Reference Workflows](docs/research/reference-workflows.md) | Reviewed precedents, failure reports, and adopted lessons |
 | [Architecture Decisions](adr/) | Decisions active in this repository |
 | [Verification Evidence](evidence/) | Captured checks for implemented capabilities |

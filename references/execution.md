@@ -4,15 +4,15 @@ Use this phase only on a later request or trusted event to execute, reverify, or
 
 ## Revalidate before selection
 
-1. Run Planning Revision Validation using the entry point in `docs/10-runtime-mapping.md` relative to the Autodev Skill root. On failure, stop without creating output, evidence, or a learning candidate.
-2. For local planning files, read each approval-bound file once, hash those exact bytes against the Approval Record, and retain the same-byte snapshots. For rooted GitHub, retain the validated Issue Graph projection. Do not reread an approval-bound file or rooted Issue Graph for selection or execution.
+1. Run Planning Revision Validation using the entry point in `docs/10-runtime-mapping.md` relative to the Autodev Skill root. For Kaneo, first build a fresh complete projection using [Kaneo](kaneo.md), then use its validation command. On failure, stop without creating output, evidence, or a learning candidate.
+2. For local planning files, read each approval-bound file once, hash those exact bytes against the Approval Record, and retain the same-byte snapshots. For rooted GitHub or Kaneo, retain the validated Task Graph projection. Do not reread a retained projection for selection or execution.
 3. Before resolving a requested or automatic local task, inspect `required_planning_transition`. If its `after_task` has verified evidence for the current revision, stop before any task selection and report the transition reason. A named later task does not bypass this marker.
 
 ## Select a legacy task
 
-Use this section for a local Task Graph or a GitHub source with `root_issue`.
+Use this section for a local Task Graph, a GitHub source with `root_issue`, or Kaneo.
 
-Read the current approval revision from `planning_revision`, or from the legacy `files` mapping for a local task source. The GitHub root issue is not a task, and Issue state does not prove completion. Use the local task ID as its evidence key. Use `OWNER/REPO#NUMBER` for a GitHub task. Scan Markdown files under `evidence/` instead of deriving a path from either unchecked key.
+Read the current approval revision from `planning_revision`, or from the legacy `files` mapping for a local task source. The GitHub root issue is not a task. GitHub Issue state and Kaneo task status do not prove completion. Use the local task ID as its evidence key, `OWNER/REPO#NUMBER` for a GitHub task, and `kaneo:PROJECT_ID:TASK_ID` for a Kaneo task. Scan Markdown files under `evidence/` instead of deriving a path from an unchecked key.
 
 A task or dependency is complete when one record has that exact YAML string in `task`, has `status: verified`, and repeats the current approval revision as `planning_revision`. Only when no current record exists, treat verified evidence for another planning revision as stale and exclude that task from automatic selection.
 
@@ -58,7 +58,7 @@ Read every planning reference selected by the task, using a retained snapshot wh
 
 If execution exposes a material change to the goal, scope, dependencies, verification, or semantic project configuration, stop. Return project approval to pending only when the project revision must change. A rootless task-content change requires a new trusted task authorization.
 
-Run every task verification check, then run Planning Revision Validation again. For rootless GitHub, also require the retained raw task digest and active authorization generation to remain current. Write evidence only when every gate passes. Never change approved planning content to record progress.
+Run every task verification check, then run Planning Revision Validation again. For Kaneo, make another fresh complete MCP read and validate its projection. For rootless GitHub, also require the retained raw task digest and active authorization generation to remain current. Write evidence only when every gate passes. Never change approved planning content to record progress.
 
 Canonicalize the project root and the nearest existing parent of `evidence/`; stop unless that parent equals or is contained by the project root. Create `evidence/` only after this check, then canonicalize it and require it to remain under the project root. Choose a safe `.md` basename without path separators, independently of the task ID, and create it exclusively inside `evidence/`. Include:
 
@@ -69,5 +69,7 @@ Canonicalize the project root and the nearest existing parent of `evidence/`; st
 - the exact checked artifact, command or test, or named human review and its result
 
 Keep the record concise. A link or short result is evidence; copied logs and a second task description are not.
+
+For Kaneo, move the verified task to the project's completion column only when the user request or project instructions authorize board updates. Re-read the task after the write and confirm its ID, project, and status. The evidence record remains the completion authority for Autodev.
 
 After writing verified evidence, read [Learning](learning.md) completely and apply it.

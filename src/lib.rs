@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::fmt;
 use std::fmt::Write as _;
 use std::fs;
@@ -70,6 +70,12 @@ enum TaskSource {
         #[serde(default)]
         root_issue: Option<u64>,
     },
+    #[serde(rename = "kaneo")]
+    Kaneo {
+        server: String,
+        workspace_id: String,
+        project_id: String,
+    },
 }
 
 #[derive(Debug, Deserialize)]
@@ -119,7 +125,7 @@ struct Approval {
 struct PlanningRevision {
     project_overview: OverviewRevision,
     #[serde(default)]
-    task_source: Option<GitHubTaskSourceRevision>,
+    task_source: Option<TaskSourceRevision>,
     #[serde(default)]
     project: Option<ProjectRevisionRecord>,
 }
@@ -132,13 +138,21 @@ struct OverviewRevision {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct GitHubTaskSourceRevision {
-    #[serde(rename = "type")]
-    kind: String,
-    repository: String,
-    root_issue: u64,
-    sha256: String,
+#[serde(deny_unknown_fields, tag = "type")]
+enum TaskSourceRevision {
+    #[serde(rename = "github_issues")]
+    GitHubIssues {
+        repository: String,
+        root_issue: u64,
+        sha256: String,
+    },
+    #[serde(rename = "kaneo")]
+    Kaneo {
+        server: String,
+        workspace_id: String,
+        project_id: String,
+        sha256: String,
+    },
 }
 
 #[derive(Debug, Deserialize)]
@@ -307,6 +321,50 @@ pub struct GitHubIssueProjection {
 pub struct ProjectionOutput {
     pub sha256: String,
     pub projection: GitHubIssueProjection,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct KaneoTaskProjectionInput {
+    pub server: String,
+    pub workspace_id: String,
+    pub project_id: String,
+    pub tasks: Vec<KaneoProjectedTask>,
+    #[serde(default)]
+    pub relations: Vec<KaneoTaskRelation>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct KaneoProjectedTask {
+    pub id: String,
+    pub number: u64,
+    pub project_id: String,
+    pub title: String,
+    pub description: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct KaneoTaskRelation {
+    pub source_task_id: String,
+    pub target_task_id: String,
+    pub relation_type: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct KaneoTaskProjection {
+    server: String,
+    workspace_id: String,
+    project_id: String,
+    tasks: Vec<KaneoProjectedTask>,
+    relations: Vec<KaneoTaskRelation>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct KaneoProjectionOutput {
+    pub sha256: String,
+    pub projection: KaneoTaskProjection,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -635,7 +693,49 @@ pub fn validate_with_api(
             validate_project_approval(&approval, &revision)?;
             Ok(None)
         }
+        TaskSource::Kaneo { .. } => Err(ValidationError::new(
+            "Kaneo validation requires --validate-kaneo-task-projection with a fresh MCP projection",
+        )),
     }
+}
+
+pub fn kaneo_task_projection(
+    project_root: &Path,
+    input: KaneoTaskProjectionInput,
+) -> Result<KaneoProjectionOutput> {
+    let root = canonical_project_root(project_root)?;
+    let config_path = project_file(&root, CONFIG_PATH, "config")?;
+    let config_bytes = read_file(&config_path, "config")?;
+    let config: Config = parse_yaml(&config_bytes, "config")?;
+    let source = configured_task_source(&config)?;
+    build_kaneo_projection(&root, &source, input)
+}
+
+pub fn validate_kaneo_task_projection(
+    project_root: &Path,
+    input: KaneoTaskProjectionInput,
+) -> Result<KaneoProjectionOutput> {
+    let root = canonical_project_root(project_root)?;
+    let config_path = project_file(&root, CONFIG_PATH, "config")?;
+    let approval_path = project_file(&root, APPROVAL_PATH, "approval record")?;
+    let config_bytes = read_file(&config_path, "config")?;
+    let approval_bytes = read_file(&approval_path, "approval record")?;
+    let config: Config = parse_yaml(&config_bytes, "config")?;
+    let approval: Approval = parse_yaml(&approval_bytes, "approval record")?;
+    validate_approval_identity(&approval)?;
+    let overview_path = project_file(&root, &config.project_overview, "project_overview")?;
+    let overview_bytes = read_file(&overview_path, "project overview")?;
+    validate_overview(&overview_bytes)?;
+    let source = configured_task_source(&config)?;
+    let projection = build_kaneo_projection(&root, &source, input)?;
+    validate_kaneo_approval_metadata(
+        &approval,
+        &config.project_overview,
+        &overview_bytes,
+        &source,
+        &projection.sha256,
+    )?;
+    Ok(projection)
 }
 
 pub fn task_source_projection(project_root: &Path) -> Result<ProjectionOutput> {
@@ -741,6 +841,14 @@ pub enum CliCommand {
     PrintValidatedTaskProjection {
         root: PathBuf,
     },
+    PrintKaneoTaskProjection {
+        root: PathBuf,
+        input: PathBuf,
+    },
+    ValidateKaneoTaskProjection {
+        root: PathBuf,
+        input: PathBuf,
+    },
     PrintTaskSnapshot {
         root: PathBuf,
         issue: u64,
@@ -789,6 +897,24 @@ pub fn parse_cli(arguments: &[String]) -> Result<CliCommand> {
         "--print-validated-task-projection" => Ok(CliCommand::PrintValidatedTaskProjection {
             root: positional_root(rest)?,
         }),
+        "--print-kaneo-task-projection" => {
+            let mut options = CliOptions::parse(rest, command)?;
+            let command = CliCommand::PrintKaneoTaskProjection {
+                root: options.path("root")?,
+                input: options.path("input")?,
+            };
+            options.finish()?;
+            Ok(command)
+        }
+        "--validate-kaneo-task-projection" => {
+            let mut options = CliOptions::parse(rest, command)?;
+            let command = CliCommand::ValidateKaneoTaskProjection {
+                root: options.path("root")?,
+                input: options.path("input")?,
+            };
+            options.finish()?;
+            Ok(command)
+        }
         "--print-task-snapshot" => {
             let mut options = CliOptions::parse(rest, command)?;
             let command = CliCommand::PrintTaskSnapshot {
@@ -1904,6 +2030,135 @@ fn projection_output(projection: GitHubIssueProjection) -> Result<ProjectionOutp
     })
 }
 
+fn build_kaneo_projection(
+    root: &Path,
+    source: &TaskSource,
+    input: KaneoTaskProjectionInput,
+) -> Result<KaneoProjectionOutput> {
+    let TaskSource::Kaneo {
+        server,
+        workspace_id,
+        project_id,
+    } = source
+    else {
+        return Err(ValidationError::new("configured task source is not Kaneo"));
+    };
+    if input.server != *server
+        || input.workspace_id != *workspace_id
+        || input.project_id != *project_id
+    {
+        return Err(ValidationError::new(
+            "Kaneo projection does not match the configured Task Source",
+        ));
+    }
+    if input.tasks.is_empty() {
+        return Err(ValidationError::new(
+            "Kaneo task projection must contain at least one task",
+        ));
+    }
+
+    let mut tasks = input.tasks;
+    tasks.sort_by(|left, right| {
+        left.number
+            .cmp(&right.number)
+            .then_with(|| left.id.cmp(&right.id))
+    });
+    let mut task_ids = HashSet::new();
+    let mut task_numbers = HashSet::new();
+    for task in &tasks {
+        if task.id.trim().is_empty() {
+            return Err(ValidationError::new("Kaneo task has an empty id"));
+        }
+        if !task_ids.insert(task.id.clone()) {
+            return Err(ValidationError::new(format!(
+                "Kaneo task projection contains duplicate task id: {}",
+                task.id
+            )));
+        }
+        if task.number == 0 || !task_numbers.insert(task.number) {
+            return Err(ValidationError::new(format!(
+                "Kaneo task projection contains invalid or duplicate task number: {}",
+                task.number
+            )));
+        }
+        if task.project_id != *project_id {
+            return Err(ValidationError::new(format!(
+                "Kaneo task {} belongs to another project",
+                task.id
+            )));
+        }
+        if task.title.trim().is_empty() {
+            return Err(ValidationError::new(format!(
+                "Kaneo task #{} has an empty title",
+                task.number
+            )));
+        }
+        validate_task_body(
+            root,
+            &format!("Kaneo task #{}", task.number),
+            &task.description,
+        )?;
+    }
+
+    let relations = input
+        .relations
+        .into_iter()
+        .map(|relation| {
+            if !matches!(
+                relation.relation_type.as_str(),
+                "blocks" | "subtask" | "related"
+            ) {
+                return Err(ValidationError::new(format!(
+                    "Kaneo relation has unsupported type: {}",
+                    relation.relation_type
+                )));
+            }
+            if relation.source_task_id == relation.target_task_id {
+                return Err(ValidationError::new(
+                    "Kaneo task relation cannot link a task to itself",
+                ));
+            }
+            if !task_ids.contains(&relation.source_task_id)
+                || !task_ids.contains(&relation.target_task_id)
+            {
+                return Err(ValidationError::new(
+                    "Kaneo task relation endpoint is outside the configured project",
+                ));
+            }
+            Ok(relation)
+        })
+        .collect::<Result<BTreeSet<_>>>()?
+        .into_iter()
+        .collect::<Vec<_>>();
+
+    let dependencies = task_ids
+        .iter()
+        .map(|id| {
+            let blockers = relations
+                .iter()
+                .filter(|relation| {
+                    relation.relation_type == "blocks" && relation.target_task_id == *id
+                })
+                .map(|relation| relation.source_task_id.clone())
+                .collect();
+            (id.clone(), blockers)
+        })
+        .collect::<HashMap<_, _>>();
+    validate_dependency_cycles(&task_ids.iter().cloned().collect::<Vec<_>>(), &dependencies)?;
+
+    let projection = KaneoTaskProjection {
+        server: server.clone(),
+        workspace_id: workspace_id.clone(),
+        project_id: project_id.clone(),
+        tasks,
+        relations,
+    };
+    Ok(KaneoProjectionOutput {
+        sha256: json_digest(&projection, "Kaneo task projection")?,
+        projection,
+    })
+}
+
 fn canonical_project_root(path: &Path) -> Result<PathBuf> {
     if !path.is_dir() {
         return Err(ValidationError::new(format!(
@@ -1939,11 +2194,32 @@ fn configured_task_source(config: &Config) -> Result<TaskSource> {
                         ));
                     }
                 }
+                TaskSource::Kaneo {
+                    server,
+                    workspace_id,
+                    project_id,
+                } => {
+                    validate_http_endpoint(server)?;
+                    required_text(workspace_id, "config task_source workspace_id")?;
+                    required_text(project_id, "config task_source project_id")?;
+                }
                 _ => {}
             }
             Ok(source.clone())
         }
     }
+}
+
+fn validate_http_endpoint(value: &str) -> Result<()> {
+    let value = value.trim();
+    if !(value.starts_with("https://") || value.starts_with("http://"))
+        || value.chars().any(char::is_whitespace)
+    {
+        return Err(ValidationError::new(
+            "config task_source server must be an HTTP or HTTPS URL",
+        ));
+    }
+    Ok(())
 }
 
 fn validate_repository(repository: &str) -> Result<()> {
@@ -2488,12 +2764,18 @@ fn validate_github_task_body(root: &Path, task: &ProjectedIssue) -> Result<()> {
         .ok_or_else(|| {
             ValidationError::new(format!("task issue #{} has an empty body", task.number))
         })?;
+    validate_task_body(root, &format!("task issue #{}", task.number), body)
+}
+
+fn validate_task_body(root: &Path, label: &str, body: &str) -> Result<()> {
+    if body.trim().is_empty() {
+        return Err(ValidationError::new(format!("{label} has an empty body")));
+    }
     let sections = markdown_sections(body)?;
     for heading in ["outcome", "planning references", "verification"] {
         if !sections.contains_key(heading) {
             return Err(ValidationError::new(format!(
-                "task issue #{} is missing ## {}",
-                task.number,
+                "{label} is missing ## {}",
                 title_case(heading)
             )));
         }
@@ -2501,36 +2783,26 @@ fn validate_github_task_body(root: &Path, task: &ProjectedIssue) -> Result<()> {
 
     if remove_html_comments(&sections["outcome"]).trim().is_empty() {
         return Err(ValidationError::new(format!(
-            "task issue #{} has an empty Outcome",
-            task.number
+            "{label} has an empty Outcome"
         )));
     }
     let references = markdown_bullets(
         &sections["planning references"],
-        &format!("task issue #{} Planning references", task.number),
+        &format!("{label} Planning references"),
     )?;
-    let checks = markdown_bullets(
-        &sections["verification"],
-        &format!("task issue #{} Verification", task.number),
-    )?;
+    let checks = markdown_bullets(&sections["verification"], &format!("{label} Verification"))?;
     if references.is_empty() {
         return Err(ValidationError::new(format!(
-            "task issue #{} has no Planning references",
-            task.number
+            "{label} has no Planning references"
         )));
     }
     if checks.is_empty() {
         return Err(ValidationError::new(format!(
-            "task issue #{} has no Verification checks",
-            task.number
+            "{label} has no Verification checks"
         )));
     }
     for reference in references {
-        validate_planning_reference(
-            root,
-            markdown_link_target(&reference),
-            &format!("task issue #{}", task.number),
-        )?;
+        validate_planning_reference(root, markdown_link_target(&reference), label)?;
     }
     Ok(())
 }
@@ -2680,7 +2952,7 @@ fn validate_local_approval(
 ) -> Result<()> {
     if approval.planning_revision.is_some() {
         return Err(ValidationError::new(
-            "local approval must not contain a GitHub planning_revision",
+            "local approval must not contain an external planning_revision",
         ));
     }
     let files = approval.files.as_ref().ok_or_else(|| {
@@ -2742,20 +3014,89 @@ fn validate_github_approval_metadata(
         .task_source
         .as_ref()
         .ok_or_else(|| ValidationError::new("rooted GitHub approval is missing task_source"))?;
-    if recorded.kind != "github_issues"
-        || recorded.repository != *repository
-        || recorded.root_issue != *root_issue
+    let TaskSourceRevision::GitHubIssues {
+        repository: recorded_repository,
+        root_issue: recorded_root_issue,
+        sha256,
+    } = recorded
+    else {
+        return Err(ValidationError::new(
+            "approval task_source does not match config",
+        ));
+    };
+    if recorded_repository != repository || recorded_root_issue != root_issue {
+        return Err(ValidationError::new(
+            "approval task_source does not match config",
+        ));
+    }
+    if !is_sha256(sha256) {
+        return Err(ValidationError::new(
+            "approval task_source has an invalid SHA-256 digest",
+        ));
+    }
+    Ok(sha256.clone())
+}
+
+fn validate_kaneo_approval_metadata(
+    approval: &Approval,
+    overview_relative: &str,
+    overview_bytes: &[u8],
+    source: &TaskSource,
+    current_projection_sha256: &str,
+) -> Result<()> {
+    if approval.files.is_some() {
+        return Err(ValidationError::new(
+            "Kaneo approval must not contain a local files mapping",
+        ));
+    }
+    let revision = approval.planning_revision.as_ref().ok_or_else(|| {
+        ValidationError::new(
+            "approval record must contain project_overview and task_source planning revisions",
+        )
+    })?;
+    if revision.project.is_some() || revision.project_overview.path != overview_relative {
+        return Err(ValidationError::new(
+            "approval project_overview does not match config",
+        ));
+    }
+    validate_file_digest(
+        Some(&revision.project_overview.sha256),
+        overview_bytes,
+        overview_relative,
+    )?;
+    let TaskSource::Kaneo {
+        server,
+        workspace_id,
+        project_id,
+    } = source
+    else {
+        unreachable!("Kaneo approval requires a Kaneo task source");
+    };
+    let Some(TaskSourceRevision::Kaneo {
+        server: recorded_server,
+        workspace_id: recorded_workspace_id,
+        project_id: recorded_project_id,
+        sha256,
+    }) = revision.task_source.as_ref()
+    else {
+        return Err(ValidationError::new(
+            "Kaneo approval is missing a matching task_source revision",
+        ));
+    };
+    if recorded_server != server
+        || recorded_workspace_id != workspace_id
+        || recorded_project_id != project_id
     {
         return Err(ValidationError::new(
             "approval task_source does not match config",
         ));
     }
-    if !is_sha256(&recorded.sha256) {
+    if !is_sha256(sha256) || sha256 != current_projection_sha256 {
         return Err(ValidationError::new(
-            "approval task_source has an invalid SHA-256 digest",
+            "approval task_source does not match the current Kaneo Task Graph",
         ));
     }
-    Ok(recorded.sha256.clone())
+    Ok(())
 }
 
 fn validate_project_approval(

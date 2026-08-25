@@ -66,7 +66,7 @@ due or contradicted Knowledge -> current-source research
 - Add event-driven delivery as a replaceable adapter. GitHub Actions holds authorization and the deterministic gates, while the engine runs on an operator-invoked local host with its existing subscription. The selected engine and model version are operational state inside the approved provider, data-use, and cost policy.
 - Accept that implementation advances only while the operator runs the delivery command. GitHub holds durable episode state between runs, so an unavailable machine delays work instead of losing it.
 - Use GitHub Issues, pull requests, checks, comments, and labels as durable workflow state. Do not add a queue, Task database, or paused model process.
-- Keep the core vocabulary provider-neutral, but implement only GitHub before a real project requires another Task Source or delivery environment.
+- Keep the core vocabulary provider-neutral. Support Kaneo as the first external conversational Task Source required by a real project, while retaining GitHub as the only autonomous delivery adapter.
 - Preserve general planning and conversational execution for non-software work. The first autonomous delivery adapter applies only to repository-based work.
 
 ### Delegation policy
@@ -85,6 +85,7 @@ due or contradicted Knowledge -> current-source research
 - Bind a task snapshot to canonical raw GitHub issue identity, title, body, dependency identities, and the project revision. Give the Agent a separate integrity-filtered projection and record both digests. A task edit invalidates only that task. Adding or changing another issue does not.
 - Record the snapshot digest, authorizing actor, authorization event identity and generation, and project revision with the workflow run and resulting pull request or evidence.
 - Configure one GitHub repository as the Task Source without requiring a root issue. A native blocking edge is valid only when both endpoints are issues in that repository.
+- Configure one Kaneo MCP server, workspace, and project as an alternative Task Source. Bind task ID, number, title, description, and native relations in a canonical projection supplied by a fresh complete Host read. Exclude task status and other progress metadata. Do not keep a local task mirror.
 - Treat a dependency as complete only when its approved result has verified evidence and its pull request is merged into the dependent task's base. Dependency completion re-evaluates already authorized blocked issues.
 - Keep execution progress outside approval-bound content. Labels, pull request state, comments, checks, and evidence may change without rewriting the task.
 - Assign a monotonic authorization generation under per-issue concurrency and retain its durable authorization record. Replays of the same ready-label event reuse the generation; a new ready application after abandonment creates the next generation even when task content is unchanged.
@@ -169,7 +170,7 @@ These boundaries are recorded in [ADR 0006](../adr/0006-add-an-event-driven-impr
 ## Non-goals for the first autonomous milestone
 
 - Deployment or release automation
-- Task adapters for GitLab, Linear, Jira, or other providers
+- Task adapters for GitLab, Linear, Jira, or providers other than GitHub and Kaneo
 - A custom Autodev server, queue, scheduler, dashboard, or notification service
 - Continuous background model sessions
 - Automatic promotion of insight candidates or self-expansion of Agent authority
