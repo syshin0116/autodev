@@ -4,11 +4,29 @@ Use this phase to create or revise one planning revision and record its explicit
 
 ## Establish the project contract
 
-1. Read `.autodev/config.yaml` in the target project. If the project contract is absent, copy only missing files from `templates/project` relative to the Autodev Skill root. Never overwrite existing project artifacts.
-2. Use the configured `project_overview` and exactly one task source. `task_graph` selects the local file shape. `task_source.type: github_issues` selects one repository. A configured `root_issue` preserves the rooted Issue Graph shape for existing projects. Without it, each Issue is an independently authorized task. Never treat more than one source as active.
-3. Resolve configured external paths from the project root unless they are absolute. Treat `knowledge_roots` as the complete set of Markdown directories selected for this project. If it is absent or empty, ask the user to select roots or explicitly continue without prior knowledge. Never scan an unselected directory.
-4. Keep selected roots read-only. Treat a root supplied for one run as session-only unless it is already configured or the user asks to persist it. Do not write a sensitive local path into a tracked project file.
-5. For rootless GitHub, complete the semantic project configuration required by [Planning Revision Validation](../docs/20-capability-contracts/planning-revision-validation.md). Keep credentials, local Knowledge paths, installation state, authentication state, and the selected engine and version outside its approval projection.
+Read `.autodev/config.yaml` first. When it exists, use it and ask only about a missing or invalid setting. When it is absent, establish the configuration as the first part of the same planning conversation. Do not require a separate init command or copy the whole project template before understanding the repository.
+
+Before asking a setup question or writing a file, inspect only the target project and infer unambiguous settings:
+
+- Resolve the project root from the selected workspace or explicit target.
+- Inspect existing project documentation, local task files, Autodev state, and Git remote metadata. Do not scan outside the project for Knowledge.
+- Use an existing `docs/project-overview.md` as the Overview entry point. When project documentation clearly lives under `docs/` but the entry point is absent, use that path for the Overview that Planning will create later. Ask where it belongs only when the repository establishes another documentation location or the choice is ambiguous.
+- Select an existing local task file only when there is one clear candidate. If local tasks are selected and no candidate exists, use `docs/tasks.yaml` when `docs/` is the established project documentation directory. A GitHub remote identifies the repository after GitHub Issues is selected, but does not itself select GitHub Issues as the task source.
+
+Ask only for choices that cannot be established from the repository or the request:
+
+- local task file or GitHub Issues when no task source is already established
+- the exact local task path when multiple candidates exist or no project documentation directory is established
+- the GitHub repository when the selected task source is GitHub Issues and the remote is absent or ambiguous
+- selected Markdown Knowledge Roots, or explicit permission to continue without prior Knowledge
+
+Show the inferred and user-selected settings together, then write only `.autodev/config.yaml`. Do not create an Overview, Task Graph, Approval Record, or evidence during setup. Continue directly into the planning interview, where missing planning artifacts may be created from the templates.
+
+Use the configured `project_overview` and exactly one task source. `task_graph` selects the local file shape. `task_source.type: github_issues` selects one repository. A configured `root_issue` preserves the rooted Issue Graph shape for existing projects. Without it, each Issue is an independently authorized task. Never treat more than one source as active.
+
+Resolve configured external paths from the project root unless they are absolute. Treat `knowledge_roots` as the complete set of Markdown directories selected for this project. Never scan an unselected directory. Keep selected roots read-only. Treat a root supplied for one run as session-only unless it is already configured or the user asks to persist it. Do not write a sensitive local path into a tracked project file.
+
+For rootless GitHub, complete the semantic project configuration required by [Planning Revision Validation](../docs/20-capability-contracts/planning-revision-validation.md). Keep credentials, local Knowledge paths, installation state, authentication state, and the selected engine and version outside its approval projection.
 
 ## Use prior knowledge selectively
 

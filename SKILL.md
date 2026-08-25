@@ -17,7 +17,7 @@ Read the selected phase guide completely before acting:
 - For a trusted task event or an explicit request to execute, reverify, or rerun a task, read [Execution](references/execution.md).
 - After verified execution, or when reviewing learning candidates at project close, read [Learning](references/learning.md).
 
-For a status or continuation request, inspect the configured planning, approval, and evidence state first, then load only the relevant phase. If `.autodev/config.yaml` is absent, only Planning may initialize the project contract.
+For a status or continuation request, inspect the configured planning, approval, and evidence state first, then load only the relevant phase. If `.autodev/config.yaml` is absent, only Planning may establish it through first-use discovery and a focused setup interview. Do not require a separate init command.
 
 ## Preserve cross-phase boundaries
 

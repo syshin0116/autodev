@@ -68,7 +68,7 @@ Open the target project in Codex and start with a rough idea:
 $autodev Plan a volunteer onboarding workshop. Use a local task file.
 ```
 
-Autodev adds only missing project-contract files, resolves material planning questions, and presents the complete planning revision. After reviewing it, approve in a separate response:
+On first use, Autodev inspects the project, asks only for settings it cannot infer, writes `.autodev/config.yaml`, and continues into planning without a separate init command. It then creates only missing planning artifacts, resolves material questions, and presents the complete planning revision. After reviewing it, approve in a separate response:
 
 ```text
 I approve this exact planning revision for execution.
