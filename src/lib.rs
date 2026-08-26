@@ -10,7 +10,6 @@ use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 
 const CONFIG_PATH: &str = ".autodev/config.yaml";
-const APPROVAL_PATH: &str = ".autodev/approval.yaml";
 pub const GITHUB_API_VERSION: &str = "2026-03-10";
 
 pub type Result<T> = std::result::Result<T, ValidationError>;
@@ -109,55 +108,10 @@ struct LocalTask {
     verify: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
-struct Approval {
-    status: Option<String>,
-    approved_by: Option<String>,
-    approved_at: Option<String>,
-    #[serde(default)]
-    files: Option<BTreeMap<String, String>>,
-    #[serde(default)]
-    planning_revision: Option<PlanningRevision>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct PlanningRevision {
-    project_overview: OverviewRevision,
-    #[serde(default)]
-    task_source: Option<TaskSourceRevision>,
-    #[serde(default)]
-    project: Option<ProjectRevisionRecord>,
-}
-
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 struct OverviewRevision {
     path: String,
-    sha256: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields, tag = "type")]
-enum TaskSourceRevision {
-    #[serde(rename = "github_issues")]
-    GitHubIssues {
-        repository: String,
-        root_issue: u64,
-        sha256: String,
-    },
-    #[serde(rename = "kaneo")]
-    Kaneo {
-        server: String,
-        workspace_id: String,
-        project_id: String,
-        sha256: String,
-    },
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct ProjectRevisionRecord {
     sha256: String,
 }
 
@@ -640,12 +594,8 @@ pub fn validate_with_api(
 ) -> Result<Option<ProjectionOutput>> {
     let root = canonical_project_root(project_root)?;
     let config_path = project_file(&root, CONFIG_PATH, "config")?;
-    let approval_path = project_file(&root, APPROVAL_PATH, "approval record")?;
     let config_bytes = read_file(&config_path, "config")?;
-    let approval_bytes = read_file(&approval_path, "approval record")?;
     let config: Config = parse_yaml(&config_bytes, "config")?;
-    let approval: Approval = parse_yaml(&approval_bytes, "approval record")?;
-    validate_approval_identity(&approval)?;
     let overview_path = project_file(&root, &config.project_overview, "project_overview")?;
     let overview_bytes = read_file(&overview_path, "project overview")?;
     validate_overview(&overview_bytes)?;
@@ -655,42 +605,31 @@ pub fn validate_with_api(
             let tasks_path = project_file(&root, &path, "task graph")?;
             let tasks_bytes = read_file(&tasks_path, "task graph")?;
             validate_local_tasks(&root, &tasks_bytes)?;
-            let planned_files = BTreeMap::from([
-                (config.project_overview.as_str(), overview_bytes.as_slice()),
-                (path.as_str(), tasks_bytes.as_slice()),
-            ]);
-            validate_local_approval(&approval, &planned_files)?;
+            validate_committed_planning_files(
+                &root,
+                &[CONFIG_PATH, &config.project_overview, &path],
+            )?;
             Ok(None)
         }
         source @ TaskSource::GitHubIssues {
             root_issue: Some(_),
             ..
         } => {
-            let approved_projection = validate_github_approval_metadata(
-                &approval,
-                &config.project_overview,
-                &overview_bytes,
-                &source,
-            )?;
             let projection =
                 projection_output(github_issue_projection(&root, &source, github_api)?)?;
-            if projection.sha256 != approved_projection {
-                return Err(ValidationError::new(
-                    "approval task_source does not match the current GitHub Issue Graph",
-                ));
-            }
+            validate_committed_planning_files(&root, &[CONFIG_PATH, &config.project_overview])?;
             Ok(Some(projection))
         }
         TaskSource::GitHubIssues {
             root_issue: None, ..
         } => {
-            let revision = build_project_revision(
+            build_project_revision(
                 &config,
                 &config.project_overview,
                 &overview_bytes,
                 github_api,
             )?;
-            validate_project_approval(&approval, &revision)?;
+            validate_committed_planning_files(&root, &[CONFIG_PATH, &config.project_overview])?;
             Ok(None)
         }
         TaskSource::Kaneo { .. } => Err(ValidationError::new(
@@ -717,24 +656,14 @@ pub fn validate_kaneo_task_projection(
 ) -> Result<KaneoProjectionOutput> {
     let root = canonical_project_root(project_root)?;
     let config_path = project_file(&root, CONFIG_PATH, "config")?;
-    let approval_path = project_file(&root, APPROVAL_PATH, "approval record")?;
     let config_bytes = read_file(&config_path, "config")?;
-    let approval_bytes = read_file(&approval_path, "approval record")?;
     let config: Config = parse_yaml(&config_bytes, "config")?;
-    let approval: Approval = parse_yaml(&approval_bytes, "approval record")?;
-    validate_approval_identity(&approval)?;
     let overview_path = project_file(&root, &config.project_overview, "project_overview")?;
     let overview_bytes = read_file(&overview_path, "project overview")?;
     validate_overview(&overview_bytes)?;
     let source = configured_task_source(&config)?;
     let projection = build_kaneo_projection(&root, &source, input)?;
-    validate_kaneo_approval_metadata(
-        &approval,
-        &config.project_overview,
-        &overview_bytes,
-        &source,
-        &projection.sha256,
-    )?;
+    validate_committed_planning_files(&root, &[CONFIG_PATH, &config.project_overview])?;
     Ok(projection)
 }
 
@@ -804,12 +733,8 @@ pub fn task_snapshot_with_api(
     }
     let root = canonical_project_root(project_root)?;
     let config_path = project_file(&root, CONFIG_PATH, "config")?;
-    let approval_path = project_file(&root, APPROVAL_PATH, "approval record")?;
     let config_bytes = read_file(&config_path, "config")?;
-    let approval_bytes = read_file(&approval_path, "approval record")?;
     let config: Config = parse_yaml(&config_bytes, "config")?;
-    let approval: Approval = parse_yaml(&approval_bytes, "approval record")?;
-    validate_approval_identity(&approval)?;
     let overview_path = project_file(&root, &config.project_overview, "project_overview")?;
     let overview_bytes = read_file(&overview_path, "project overview")?;
     validate_overview(&overview_bytes)?;
@@ -819,7 +744,7 @@ pub fn task_snapshot_with_api(
         &overview_bytes,
         github_api,
     )?;
-    validate_project_approval(&approval, &project_revision)?;
+    validate_committed_planning_files(&root, &[CONFIG_PATH, &config.project_overview])?;
     let task_snapshot = build_task_snapshot(&root, &project_revision, issue_number, github_api)?;
     Ok(ValidatedTaskSnapshot {
         project_revision,
@@ -1081,7 +1006,7 @@ fn authorize_task(
         || event.project_revision_sha256 != project_revision.sha256
     {
         return Err(ValidationError::new(
-            "ready event is not authorized by the approved project revision",
+            "ready event is not authorized by the current project revision",
         ));
     }
     let event_identity = AuthorizationEventIdentity {
@@ -2291,6 +2216,40 @@ fn project_file(root: &Path, relative: &str, label: &str) -> Result<PathBuf> {
     Ok(resolved)
 }
 
+fn validate_committed_planning_files(root: &Path, paths: &[&str]) -> Result<()> {
+    let tracked = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["ls-files", "--error-unmatch", "--"])
+        .args(paths)
+        .output()
+        .map_err(|error| ValidationError::new(format!("git is unavailable: {error}")))?;
+    if !tracked.status.success() {
+        return Err(ValidationError::new(format!(
+            "planning files must be tracked by Git: {}",
+            paths.join(", ")
+        )));
+    }
+
+    let committed = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["diff", "--quiet", "HEAD", "--"])
+        .args(paths)
+        .status()
+        .map_err(|error| ValidationError::new(format!("git is unavailable: {error}")))?;
+    match committed.code() {
+        Some(0) => Ok(()),
+        Some(1) => Err(ValidationError::new(format!(
+            "planning files differ from committed Git state: {}",
+            paths.join(", ")
+        ))),
+        _ => Err(ValidationError::new(
+            "committed planning state could not be read from Git",
+        )),
+    }
+}
+
 fn escapes_root(path: &Path) -> bool {
     let mut depth = 0usize;
     for component in path.components() {
@@ -2942,232 +2901,6 @@ where
 
     if visited != nodes.len() {
         return Err(ValidationError::new("task dependency cycle"));
-    }
-    Ok(())
-}
-
-fn validate_local_approval(
-    approval: &Approval,
-    planned_files: &BTreeMap<&str, &[u8]>,
-) -> Result<()> {
-    if approval.planning_revision.is_some() {
-        return Err(ValidationError::new(
-            "local approval must not contain an external planning_revision",
-        ));
-    }
-    let files = approval.files.as_ref().ok_or_else(|| {
-        ValidationError::new("approval record must cover exactly the configured planning files")
-    })?;
-    let expected_keys: Vec<_> = planned_files.keys().copied().collect();
-    let actual_keys: Vec<_> = files.keys().map(String::as_str).collect();
-    if actual_keys != expected_keys {
-        return Err(ValidationError::new(
-            "approval record must cover exactly the configured planning files",
-        ));
-    }
-    for (relative, bytes) in planned_files {
-        validate_file_digest(files.get(*relative), bytes, relative)?;
-    }
-    Ok(())
-}
-
-fn validate_github_approval_metadata(
-    approval: &Approval,
-    overview_relative: &str,
-    overview_bytes: &[u8],
-    source: &TaskSource,
-) -> Result<String> {
-    if approval.files.is_some() {
-        return Err(ValidationError::new(
-            "GitHub approval must not contain a local files mapping",
-        ));
-    }
-    let revision = approval.planning_revision.as_ref().ok_or_else(|| {
-        ValidationError::new(
-            "approval record must contain project_overview and task_source planning revisions",
-        )
-    })?;
-    if revision.project.is_some() {
-        return Err(ValidationError::new(
-            "rooted GitHub approval must not contain a project revision",
-        ));
-    }
-    if revision.project_overview.path != overview_relative {
-        return Err(ValidationError::new(
-            "approval project_overview does not match config",
-        ));
-    }
-    validate_file_digest(
-        Some(&revision.project_overview.sha256),
-        overview_bytes,
-        overview_relative,
-    )?;
-
-    let TaskSource::GitHubIssues {
-        repository,
-        root_issue: Some(root_issue),
-    } = source
-    else {
-        unreachable!("rooted GitHub approval requires a rooted GitHub source");
-    };
-    let recorded = revision
-        .task_source
-        .as_ref()
-        .ok_or_else(|| ValidationError::new("rooted GitHub approval is missing task_source"))?;
-    let TaskSourceRevision::GitHubIssues {
-        repository: recorded_repository,
-        root_issue: recorded_root_issue,
-        sha256,
-    } = recorded
-    else {
-        return Err(ValidationError::new(
-            "approval task_source does not match config",
-        ));
-    };
-    if recorded_repository != repository || recorded_root_issue != root_issue {
-        return Err(ValidationError::new(
-            "approval task_source does not match config",
-        ));
-    }
-    if !is_sha256(sha256) {
-        return Err(ValidationError::new(
-            "approval task_source has an invalid SHA-256 digest",
-        ));
-    }
-    Ok(sha256.clone())
-}
-
-fn validate_kaneo_approval_metadata(
-    approval: &Approval,
-    overview_relative: &str,
-    overview_bytes: &[u8],
-    source: &TaskSource,
-    current_projection_sha256: &str,
-) -> Result<()> {
-    if approval.files.is_some() {
-        return Err(ValidationError::new(
-            "Kaneo approval must not contain a local files mapping",
-        ));
-    }
-    let revision = approval.planning_revision.as_ref().ok_or_else(|| {
-        ValidationError::new(
-            "approval record must contain project_overview and task_source planning revisions",
-        )
-    })?;
-    if revision.project.is_some() || revision.project_overview.path != overview_relative {
-        return Err(ValidationError::new(
-            "approval project_overview does not match config",
-        ));
-    }
-    validate_file_digest(
-        Some(&revision.project_overview.sha256),
-        overview_bytes,
-        overview_relative,
-    )?;
-    let TaskSource::Kaneo {
-        server,
-        workspace_id,
-        project_id,
-    } = source
-    else {
-        unreachable!("Kaneo approval requires a Kaneo task source");
-    };
-    let Some(TaskSourceRevision::Kaneo {
-        server: recorded_server,
-        workspace_id: recorded_workspace_id,
-        project_id: recorded_project_id,
-        sha256,
-    }) = revision.task_source.as_ref()
-    else {
-        return Err(ValidationError::new(
-            "Kaneo approval is missing a matching task_source revision",
-        ));
-    };
-    if recorded_server != server
-        || recorded_workspace_id != workspace_id
-        || recorded_project_id != project_id
-    {
-        return Err(ValidationError::new(
-            "approval task_source does not match config",
-        ));
-    }
-    if !is_sha256(sha256) || sha256 != current_projection_sha256 {
-        return Err(ValidationError::new(
-            "approval task_source does not match the current Kaneo Task Graph",
-        ));
-    }
-    Ok(())
-}
-
-fn validate_project_approval(
-    approval: &Approval,
-    project_revision: &ProjectRevisionOutput,
-) -> Result<()> {
-    if approval.files.is_some() {
-        return Err(ValidationError::new(
-            "rootless GitHub approval must not contain a local files mapping",
-        ));
-    }
-    let revision = approval.planning_revision.as_ref().ok_or_else(|| {
-        ValidationError::new("approval record must contain project_overview and project revisions")
-    })?;
-    if revision.task_source.is_some() {
-        return Err(ValidationError::new(
-            "rootless GitHub approval must not contain a rooted task_source revision",
-        ));
-    }
-    if revision.project_overview != project_revision.projection.project_overview {
-        return Err(ValidationError::new(
-            "approval project_overview does not match the current project revision",
-        ));
-    }
-    let recorded = revision.project.as_ref().ok_or_else(|| {
-        ValidationError::new("rootless GitHub approval is missing project revision")
-    })?;
-    if !is_sha256(&recorded.sha256) || recorded.sha256 != project_revision.sha256 {
-        return Err(ValidationError::new("approved project revision changed"));
-    }
-    Ok(())
-}
-
-fn validate_approval_identity(approval: &Approval) -> Result<()> {
-    if approval.status.as_deref() != Some("approved") {
-        return Err(ValidationError::new(
-            "approval record status must be approved",
-        ));
-    }
-    if approval
-        .approved_by
-        .as_deref()
-        .is_none_or(|value| value.trim().is_empty())
-    {
-        return Err(ValidationError::new(
-            "approval record is missing approved_by",
-        ));
-    }
-    if approval
-        .approved_at
-        .as_deref()
-        .is_none_or(|value| value.trim().is_empty())
-    {
-        return Err(ValidationError::new(
-            "approval record is missing approved_at",
-        ));
-    }
-    Ok(())
-}
-
-fn validate_file_digest(expected: Option<&String>, bytes: &[u8], relative: &str) -> Result<()> {
-    let expected = expected.filter(|value| is_sha256(value)).ok_or_else(|| {
-        ValidationError::new(format!(
-            "approval record has an invalid SHA-256 digest for {relative}"
-        ))
-    })?;
-    let actual = sha256_hex(bytes);
-    if actual != *expected {
-        return Err(ValidationError::new(format!(
-            "approved planning file changed: {relative}"
-        )));
     }
     Ok(())
 }

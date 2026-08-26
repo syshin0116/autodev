@@ -34,11 +34,11 @@ The state this task must create.
 - A runnable or human-verifiable check.
 ```
 
-Use `blocks` for execution dependencies. Keep `subtask` and `related` relations only when they express a real relationship. Status, priority, assignee, dates, labels, and comments are operational metadata rather than approved planning content.
+Use `blocks` for execution dependencies. Keep `subtask` and `related` relations only when they express a real relationship. Status, priority, assignee, dates, labels, and comments are operational metadata rather than planning content.
 
 ## Fresh projection
 
-Before approval and every validation:
+Before review and every validation:
 
 1. Verify the configured project identity.
 2. Call `list_tasks` with only `projectId`, without `page` or `limit`. Require `pagination.page: 1`, `pagination.totalPages: 1`, and `pagination.pageSize` equal to `pagination.total`. Flatten tasks from every column plus `plannedTasks` and `archivedTasks`.
@@ -71,14 +71,14 @@ Before approval and every validation:
 
 Write this input only to a temporary file. Do not add a Kaneo mirror to the project. The validator sorts tasks and relations, removes duplicate relations, verifies project membership, validates task sections and local references, rejects dependency cycles, and prints the canonical projection and digest.
 
-Before approval:
+Inspect the current projection:
 
 ```sh
 cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- \
   --print-kaneo-task-projection --root <project-root> --input <temporary-json>
 ```
 
-After recording approval and before task work:
+Validate a fresh projection before task work:
 
 ```sh
 cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- \

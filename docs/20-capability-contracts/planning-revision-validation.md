@@ -8,9 +8,9 @@
 
 ## Purpose
 
-Block execution when the configured Project Overview or project planning contract is unresolved, structurally invalid, unreadable, or different from the approved revision.
+Block execution when the configured Project Overview or project planning contract is unresolved, structurally invalid, unreadable, untracked, or different from committed Git state.
 
-It validates project approval and the control state of a requested rootless task snapshot. It does not persist task authorization or judge plan quality, delivery readiness, or evidence.
+It validates committed local planning state and current external task projections. It also validates the control state of a requested rootless task snapshot. It does not persist task authorization or judge plan quality, delivery readiness, or evidence.
 
 ## Inputs
 
@@ -18,9 +18,8 @@ It validates project approval and the control state of a requested rootless task
 - `.autodev/config.yaml`
 - the configured Project Overview
 - exactly one task source
-- `.autodev/approval.yaml`
 
-The Overview and local planning references must resolve inside the project root.
+The configuration, Overview, and local Task Graph must resolve inside the project root, be tracked by Git, and match `HEAD` before execution. External Task Sources are read fresh instead of mirrored into a local approval record.
 
 ### Local task source
 
@@ -32,7 +31,7 @@ task_source:
   path: tasks.yaml
 ```
 
-Local approval uses the existing `files` mapping and binds the exact Overview and Task Graph bytes. An optional `required_planning_transition.after_task` must name a task in that graph.
+An optional `required_planning_transition.after_task` must name a task in that graph.
 
 ### Kaneo task source
 
@@ -46,20 +45,7 @@ task_source:
   project_id: PROJECT_ID
 ```
 
-The Host supplies a fresh complete JSON projection input from Kaneo. The validator binds task ID, number, project, title, description, and `blocks`, `subtask`, and `related` relations. It excludes status, priority, assignee, dates, comments, and labels. The input is temporary and never becomes a second Task System of Record.
-
-```yaml
-planning_revision:
-  project_overview:
-    path: docs/project-overview.md
-    sha256: <digest>
-  task_source:
-    type: kaneo
-    server: https://cloud.kaneo.app/api/mcp
-    workspace_id: WORKSPACE_ID
-    project_id: PROJECT_ID
-    sha256: <projection-digest>
-```
+The Host supplies a fresh complete JSON projection input from Kaneo. The validator binds task ID, number, project, title, description, and `blocks`, `subtask`, and `related` relations. It excludes status, priority, assignee, dates, comments, and labels. The input is temporary and never becomes a second Task System of Record. Its digest is an internal integrity output and is not copied into project configuration.
 
 ### Rooted GitHub Issues task source
 
@@ -72,19 +58,7 @@ task_source:
   root_issue: 123
 ```
 
-The root issue is a non-executable container. Its recursive sub-issues are tasks. Native blocking relationships are dependencies. Approval records the Overview digest and deterministic Issue Graph projection digest:
-
-```yaml
-planning_revision:
-  project_overview:
-    path: docs/project-overview.md
-    sha256: <digest>
-  task_source:
-    type: github_issues
-    repository: OWNER/REPO
-    root_issue: 123
-    sha256: <projection-digest>
-```
+The root issue is a non-executable container. Its recursive sub-issues are tasks. Native blocking relationships are dependencies. Validation reads the current complete Issue Graph and returns its deterministic projection.
 
 ### Rootless GitHub Issues task source
 
@@ -96,16 +70,7 @@ task_source:
   repository: OWNER/REPO
 ```
 
-Approval binds the complete project-revision projection, not a collection of Issues. The projection digest covers the Overview identity below and the semantic project configuration:
-
-```yaml
-planning_revision:
-  project_overview:
-    path: docs/project-overview.md
-    sha256: <digest>
-  project:
-    sha256: <projection-digest>
-```
+The internal project-revision projection covers the Overview identity and semantic project configuration below, not a collection of Issues. The trusted delivery adapter uses its digest to bind exact task authorization and episode state. Users do not maintain that digest.
 
 The projection binds:
 
@@ -120,7 +85,7 @@ The projection binds:
 
 It excludes credential values, machine-specific Knowledge paths, installation and authentication state, and the selected engine and version allowed by that policy. The selected engine and version remain operational evidence.
 
-Each task is later authorized against one canonical Issue snapshot. That snapshot binds repository, immutable Issue identity, number, title, raw body, direct dependency identities, and the approved project-revision digest. The adapter separately supplies integrity-filtered Agent input and records its digest beside the raw snapshot digest.
+Each task is later authorized against one canonical Issue snapshot. That snapshot binds repository, immutable Issue identity, number, title, raw body, direct dependency identities, and the project-revision digest. The adapter separately supplies integrity-filtered Agent input and records its digest beside the raw snapshot digest.
 
 Authorization and episode transitions are deterministic state decisions. The delivery adapter must serialize each Issue, persist the returned record before side effects, and supply that record on the next decision. This capability does not provide a lock or writable state carrier.
 
@@ -129,8 +94,8 @@ Authorization and episode transitions are deterministic state decisions. The del
 Every source requires:
 
 - `Open questions` begins with `None` after comments and whitespace are removed.
-- The Approval Record is approved and identifies the approver and time.
-- The current source matches the recorded approval digest.
+- The configuration and Overview are tracked and match committed Git state.
+- Every external source read is current and complete.
 
 A local Task Graph also requires non-empty unique task IDs, titles, outcomes, verification checks, valid project-relative references, known dependencies, and no dependency cycle.
 
@@ -145,33 +110,33 @@ A rooted GitHub Issue Graph also requires:
 - no pull request in task membership or dependency endpoints
 - known dependencies and no dependency cycle
 
-A rootless GitHub project also requires every projected policy group, a complete valid semantic projection, and an approval digest for it. It does not enumerate Issues during project-revision validation.
+A rootless GitHub project also requires every projected policy group and a complete valid semantic projection. It does not enumerate Issues during project-revision validation.
 
 Every GitHub task snapshot requires the three task body sections, a same-repository identity for the task and every dependency endpoint, and no pull request. A failure to read the exact task or its complete direct dependency pages fails closed. Changes to unrelated Issues do not affect its authorization.
 
-GitHub project projections exclude current Issue state, applied-label membership, assignees, and comments. Those fields may change without changing project approval and never satisfy verification.
+GitHub project projections exclude current Issue state, applied-label membership, assignees, and comments. Those fields may change without changing the project revision and never satisfy verification.
 
 ## Commands
 
-Validate the current approved revision:
+Validate the current committed planning state:
 
 ```sh
 cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- <project-root>
 ```
 
-Print the current rootless project-revision projection and SHA-256 before approval:
+Print the current rootless project-revision projection and internal SHA-256 for adapter inspection:
 
 ```sh
 cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- --print-project-revision <project-root>
 ```
 
-Print the current rooted GitHub Issue Graph projection and SHA-256 before approval:
+Print the current rooted GitHub Issue Graph projection and internal SHA-256:
 
 ```sh
 cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- --print-task-projection <project-root>
 ```
 
-Validate approval and print the exact rooted GitHub snapshot to use for execution:
+Validate committed local planning state and print the current rooted GitHub snapshot to use for execution:
 
 ```sh
 cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- --print-validated-task-projection <project-root>
@@ -184,7 +149,7 @@ cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- \
   --print-kaneo-task-projection --root <project-root> --input <temporary-json>
 ```
 
-Validate the approved Kaneo projection before and after task work:
+Validate a fresh Kaneo projection before and after task work:
 
 ```sh
 cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- \
@@ -195,7 +160,7 @@ cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- \
 
 These commands are for a trusted adapter job, never for the Agent. Each reads its inputs from files, prints one JSON decision, and writes nothing. The adapter owns per-issue serialization and persistence.
 
-Validate approval and print the raw snapshot for one authorized issue. It requires the approved ready label, so an unlabeled issue fails closed:
+Validate committed project state and print the raw snapshot for one authorized issue. It requires the configured ready label, so an unlabeled issue fails closed:
 
 ```sh
 cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- \
@@ -217,7 +182,7 @@ cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- \
   --transition --root <project-root> --event <episode-event.json> --current <authorization.json>
 ```
 
-Complete a merged episode. `--evidence` is the verified evidence for that exact episode, and `--merged-into` must be the approved base branch:
+Complete a merged episode. `--evidence` is the verified evidence for that exact episode, and `--merged-into` must be the configured base branch:
 
 ```sh
 cargo run --locked --quiet --manifest-path <autodev-skill>/Cargo.toml -- \
@@ -236,4 +201,4 @@ The printed record is the next durable state. Persist it before any side effect,
 
 ## Result
 
-Success means only that the declared project plan is closed, structurally valid, readable, and identical to the approval record. Rooted GitHub and Kaneo execution use the Task Graph projection returned by validation. A trusted Host-side adapter uses the Rust library boundary to retain a rootless GitHub raw task snapshot outside Agent input, then passes only integrity-filtered input and the two digests onward. Any incomplete external read, API error, malformed response, or digest mismatch fails closed without modifying project files.
+Success means only that the declared project plan is closed, structurally valid, readable, and committed, and that the external read is complete when applicable. Rooted GitHub and Kaneo execution use the fresh Task Graph projection returned by validation. A trusted Host-side adapter uses the Rust library boundary to retain a rootless GitHub raw task snapshot outside Agent input, then passes only integrity-filtered input and internal digests onward. Any incomplete external read, API error, malformed response, uncommitted planning change, or internal digest mismatch fails closed without modifying project files.

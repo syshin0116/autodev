@@ -1,7 +1,0 @@
-project: autodev-rebuild
-status: approved
-approved_by: user
-approved_at: "2026-08-09T16:25:07Z"
-files:
-  docs/project-overview.md: 170f15d93f44324ac7132868be87156fec10d19d5e2956e4c06c793d161aee34
-  tasks.yaml: 3b3bc02f484c9494ebc5b9913f8264c7944d48e94509b0ffe5e38a86b5adb4c6

@@ -2,10 +2,9 @@ use autodev_planning_revision::{
     KaneoProjectedTask, KaneoTaskProjectionInput, KaneoTaskRelation, kaneo_task_projection,
     validate_kaneo_task_projection,
 };
-use sha2::{Digest, Sha256};
-use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -16,18 +15,14 @@ fn kaneo_projection_binds_task_content_and_relations() {
     let project = Project::new();
     let input = projection_input();
     let projection = kaneo_task_projection(project.root(), input.clone()).expect("projection");
-    project.approve(&projection.sha256);
 
-    validate_kaneo_task_projection(project.root(), input.clone()).expect("approved projection");
+    validate_kaneo_task_projection(project.root(), input.clone()).expect("current projection");
 
     let mut changed = input.clone();
     changed.tasks[0].title.push_str(" changed");
-    let error = validate_kaneo_task_projection(project.root(), changed)
-        .expect_err("changed task must invalidate approval");
-    assert!(
-        error.to_string().contains("current Kaneo Task Graph"),
-        "{error}"
-    );
+    let changed = validate_kaneo_task_projection(project.root(), changed)
+        .expect("fresh external task state is authoritative");
+    assert_ne!(projection.sha256, changed.sha256);
 
     let mut reordered = input;
     reordered.tasks.reverse();
@@ -134,38 +129,19 @@ impl Project {
             ),
         )
         .expect("config");
+        run_git(&root, &["init", "--quiet"]);
+        run_git(&root, &["config", "user.email", "autodev@example.com"]);
+        run_git(&root, &["config", "user.name", "Autodev Test"]);
+        run_git(
+            &root,
+            &["add", ".autodev/config.yaml", "docs/project-overview.md"],
+        );
+        run_git(&root, &["commit", "--quiet", "-m", "Add planning files"]);
         Self { root }
     }
 
     fn root(&self) -> &Path {
         &self.root
-    }
-
-    fn approve(&self, projection_sha256: &str) {
-        let overview_sha256 =
-            sha256(&fs::read(self.root.join("docs/project-overview.md")).unwrap());
-        fs::write(
-            self.root.join(".autodev/approval.yaml"),
-            format!(
-                concat!(
-                    "status: approved\n",
-                    "approved_by: tester\n",
-                    "approved_at: '2026-08-25T00:00:00Z'\n",
-                    "planning_revision:\n",
-                    "  project_overview:\n",
-                    "    path: docs/project-overview.md\n",
-                    "    sha256: {}\n",
-                    "  task_source:\n",
-                    "    type: kaneo\n",
-                    "    server: https://cloud.kaneo.app/api/mcp\n",
-                    "    workspace_id: workspace-1\n",
-                    "    project_id: project-1\n",
-                    "    sha256: {}\n",
-                ),
-                overview_sha256, projection_sha256
-            ),
-        )
-        .expect("approval");
     }
 }
 
@@ -175,11 +151,17 @@ impl Drop for Project {
     }
 }
 
-fn sha256(bytes: &[u8]) -> String {
-    Sha256::digest(bytes)
-        .iter()
-        .fold(String::with_capacity(64), |mut output, byte| {
-            write!(&mut output, "{byte:02x}").expect("write digest");
-            output
-        })
+fn run_git(root: &Path, arguments: &[&str]) {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(arguments)
+        .output()
+        .expect("run git");
+    assert!(
+        output.status.success(),
+        "git {:?}: {}",
+        arguments,
+        String::from_utf8_lossy(&output.stderr)
+    );
 }

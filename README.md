@@ -2,7 +2,7 @@
 
 # autodev
 
-**Turn a rough idea and selected knowledge into an approved plan your Agent Host can execute.**
+**Turn a rough idea and selected knowledge into a reviewed plan your Agent Host can execute.**
 
 [![Agent Skill](https://img.shields.io/badge/Agent-Skill-6f42c1)](SKILL.md)
 [![Rust 1.85+](https://img.shields.io/badge/Rust-1.85%2B-dea584?logo=rust)](Cargo.toml)
@@ -11,7 +11,7 @@
 
 </div>
 
-Autodev is an Agent Skill for knowledge-aware project planning and execution. It interviews only while an unresolved answer can change the plan, writes a concise Project Overview and dependency-aware Task Graph, and binds approval to that exact revision. On a later request, the Agent Host executes one ready task and records verification evidence.
+Autodev is an Agent Skill for knowledge-aware project planning and execution. It interviews only while an unresolved answer can change the plan, writes a concise Project Overview and dependency-aware Task Graph, and records local planning state through Git. On a later request, the Agent Host executes one ready task and records verification evidence.
 
 The Rust binary validates planning revisions. It is not a separate planner, task runner, or Agent runtime.
 
@@ -27,7 +27,7 @@ rough idea + selected Markdown knowledge
        Project Overview + Task Graph
                     |
                     v
-       explicit revision-bound approval
+       review and record planning state
                     |
               later request
                     v
@@ -42,7 +42,7 @@ rough idea + selected Markdown knowledge
 
 ### Three guarantees
 
-1. **Approval is content-bound.** A changed Overview, local Task Graph, or approval-bound GitHub Issue projection requires a new approval.
+1. **Planning state is traceable.** Local planning files must be committed, while GitHub Issues and Kaneo are read fresh before execution.
 2. **Execution does not rewrite the plan.** Results and checks live in separate evidence records.
 3. **Knowledge stays under user control.** Selected Markdown roots are read-only, and reusable learnings remain candidates until reviewed.
 
@@ -69,13 +69,13 @@ Open the target project in Codex and start with a rough idea:
 $autodev Plan a volunteer onboarding workshop. Use a local task file.
 ```
 
-On first use, Autodev inspects the project, asks only for settings it cannot infer, writes `.autodev/config.yaml`, and continues into planning without a separate init command. It then creates only missing planning artifacts, resolves material questions, and presents the complete planning revision. After reviewing it, approve in a separate response:
+On first use, Autodev inspects the project, asks only for settings it cannot infer, writes `.autodev/config.yaml`, and continues into planning without a separate init command. It then creates only missing planning artifacts, resolves material questions, and presents the complete planning revision. After reviewing it, accept and authorize recording it in a separate response:
 
 ```text
-I approve this exact planning revision for execution.
+I accept these planning changes. Commit them and stop before execution.
 ```
 
-Autodev records and validates the approval, then stops. Execute work in a later request:
+Autodev records and validates the planning state, then stops. Execute work in a later request:
 
 ```text
 $autodev Execute the next ready task.
@@ -89,12 +89,12 @@ Autodev revalidates the revision, executes and verifies one ready task through t
 |---|---|
 | [`SKILL.md`](SKILL.md) and [`references/`](references/) | Phase routing plus planning, execution, and learning workflows |
 | `docs/project-overview.md` | Canonical project intent, decisions, scope, and success criteria |
-| `tasks.yaml`, GitHub Issues, or Kaneo | Approval-bound outcomes, dependencies, references, and checks |
+| `tasks.yaml`, GitHub Issues, or Kaneo | Outcomes, dependencies, references, and checks |
 | `.autodev/config.yaml` | Project paths and selected task source |
-| `.autodev/approval.yaml` | Approver metadata and exact planning revision digests |
-| `evidence/` | Verified task results without mutating the approved plan |
+| Git history or external task history | Reviewable planning changes without a duplicate approval record |
+| `evidence/` | Verified task results without mutating the plan |
 
-### Validate an approved revision
+### Validate committed planning state
 
 ```sh
 cargo run --locked --quiet \

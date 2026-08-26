@@ -1,6 +1,6 @@
 ---
 name: Autodev task
-about: Define one approval-bound task outcome
+about: Define one task outcome
 ---
 
 ## Outcome
@@ -15,6 +15,6 @@ about: Define one approval-bound task outcome
 
 ## Verification
 
-<!-- Use bullets, not checkboxes; checkbox edits invalidate approval. -->
+<!-- Use bullets, not checkboxes. -->
 
 -

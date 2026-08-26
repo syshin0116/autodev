@@ -8,7 +8,7 @@ Read `./.autodev-task.md`. That file is the only description of the task you may
 
 - Change only what the task's verification list requires.
 - Never edit `.autodev/**` or `.github/workflows/**`. Those paths are protected; touching them ends the episode for human review instead of producing a pull request.
-- Do not change the approved Project Overview, the Approval Record, or any evidence record from an earlier task.
+- Do not change committed planning files or any evidence record from an earlier task.
 - Do not add a dependency, a network call, or a credential.
 - Do not commit, push, or open a pull request. The runner does that after its own checks.
 
