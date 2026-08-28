@@ -69,6 +69,18 @@ fn a_single_star_does_not_cross_a_directory() {
     assert!(!matches(&patterns, "docs/nested/readme.md"));
 }
 
+// `**/` means zero or more directories, so a pattern that names a file under
+// a tree must also protect that file at the top of the tree.
+#[test]
+fn a_globstar_between_slashes_matches_zero_directories() {
+    let patterns = ["docs/**/README.md"];
+    assert!(matches(&patterns, "docs/README.md"));
+    assert!(matches(&patterns, "docs/guide/README.md"));
+    assert!(matches(&patterns, "docs/guide/deep/README.md"));
+    assert!(!matches(&patterns, "docs/README.md.bak"));
+    assert!(!matches(&patterns, "other/README.md"));
+}
+
 #[test]
 fn an_empty_list_is_refused_instead_of_matching_nothing() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

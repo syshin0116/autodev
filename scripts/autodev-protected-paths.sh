@@ -8,10 +8,14 @@
 # Usage: printf '%s\n' '.autodev/**' | autodev-protected-paths.sh
 set -euo pipefail
 
+# `**/` matches zero or more directories, so docs/**/README.md must also
+# protect docs/README.md.
 expression=$(sed \
   -e 's/[].[^$()+?{}|\\]/\\&/g' \
+  -e 's|/\*\*/|/@@GLOBSTARDIR@@|g' \
   -e 's/\*\*/@@GLOBSTAR@@/g' \
   -e 's/\*/[^\/]*/g' \
+  -e 's|@@GLOBSTARDIR@@|(.*/)?|g' \
   -e 's/@@GLOBSTAR@@/.*/g' \
   | paste -sd'|' -)
 
