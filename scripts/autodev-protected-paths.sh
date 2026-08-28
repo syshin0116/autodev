@@ -18,6 +18,18 @@ if printf '%s' "$patterns" | grep -q '@@GLOBSTAR'; then
   exit 1
 fi
 
+# `**` is a whole path segment. Anything else using it, such as a**b or a
+# repeated **/**/, is refused rather than compiled into a pattern that quietly
+# covers less than it reads like.
+if printf '%s' "$patterns" | grep -qE '\*\*[^/]|[^/]\*\*'; then
+  echo "a protected path may use ** only as a whole segment" >&2
+  exit 1
+fi
+if printf '%s' "$patterns" | grep -q '\*\*/\*\*'; then
+  echo "a protected path may not repeat **" >&2
+  exit 1
+fi
+
 # `**/` matches zero or more directories in either position, so both
 # **/README.md and docs/**/README.md protect a file at the top of their tree.
 expression=$(printf '%s\n' "$patterns" | sed \

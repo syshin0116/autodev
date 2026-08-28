@@ -221,7 +221,14 @@ scripts/autodev-changed-paths.sh "$tree" > "$work/changed.txt"
 
 protected_pattern=$(jq -r '.project_revision.projection.delivery.protected_paths[]' "$work/snapshot.json" \
   | scripts/autodev-protected-paths.sh)
-protected=$(grep -E "$protected_pattern" "$work/changed.txt" || true)
+# grep exits 1 for no match and 2 or more for a real failure, and a failure
+# here must stop delivery rather than read as nothing protected.
+set +e
+protected=$(grep -E "$protected_pattern" "$work/changed.txt")
+protected_status=$?
+set -e
+[ "$protected_status" -le 1 ] \
+  || fail "the protected path check failed with status $protected_status"
 if [ -n "$protected" ]; then
   echo "$protected" >&2
   gh issue edit "$issue" --repo "$repository" --add-label "autodev:human-needed"
