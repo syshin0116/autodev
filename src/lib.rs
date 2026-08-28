@@ -2231,23 +2231,33 @@ fn validate_committed_planning_files(root: &Path, paths: &[&str]) -> Result<()> 
         )));
     }
 
+    // Naming every checked file would send the reader to look at files that
+    // are fine, so report only the ones that actually differ.
     let committed = Command::new("git")
         .arg("-C")
         .arg(root)
-        .args(["diff", "--quiet", "HEAD", "--"])
+        .args(["diff", "--name-only", "HEAD", "--"])
         .args(paths)
-        .status()
+        .output()
         .map_err(|error| ValidationError::new(format!("git is unavailable: {error}")))?;
-    match committed.code() {
-        Some(0) => Ok(()),
-        Some(1) => Err(ValidationError::new(format!(
-            "planning files differ from committed Git state: {}",
-            paths.join(", ")
-        ))),
-        _ => Err(ValidationError::new(
+    if !committed.status.success() {
+        return Err(ValidationError::new(
             "committed planning state could not be read from Git",
-        )),
+        ));
     }
+    let changed = String::from_utf8_lossy(&committed.stdout);
+    let changed: Vec<&str> = changed
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect();
+    if changed.is_empty() {
+        return Ok(());
+    }
+    Err(ValidationError::new(format!(
+        "planning files differ from committed Git state: {}",
+        changed.join(", ")
+    )))
 }
 
 fn escapes_root(path: &Path) -> bool {

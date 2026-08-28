@@ -86,8 +86,8 @@ scripts/autodev-agent-input.sh "$work/snapshot.json" "$association" > "$work/age
 [ "$(digest "$work/agent-input.md")" = "$(jq -r '.agent_input_sha256' "$work/episode.json")" ] \
   || fail "the agent input no longer matches the authorized digest"
 
-base=$(cargo run --locked --quiet -- --print-project-revision . \
-  | jq -r '.projection.delivery.base_branch')
+cargo run --locked --quiet -- --print-project-revision . > "$work/project.json"
+base=$(jq -r '.projection.delivery.base_branch' "$work/project.json")
 
 # A dependency releases this task only when its own episode reached the merged
 # terminal state, so an unfinished predecessor blocks instead of racing.
@@ -221,7 +221,9 @@ fi
 changed=$(git -C "$tree" status --porcelain | awk '{print $NF}')
 [ -n "$changed" ] || fail "the engine produced no change"
 
-protected=$(printf '%s\n' "$changed" | grep -E '^(\.autodev/|\.github/workflows/)' || true)
+protected_pattern=$(jq -r '.projection.delivery.protected_paths[]' "$work/project.json" \
+  | scripts/autodev-protected-paths.sh)
+protected=$(printf '%s\n' "$changed" | grep -E "$protected_pattern" || true)
 if [ -n "$protected" ]; then
   echo "$protected" >&2
   gh issue edit "$issue" --repo "$repository" --add-label "autodev:human-needed"

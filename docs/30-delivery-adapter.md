@@ -90,7 +90,9 @@ scripts/autodev-deliver.sh --issue 7          # stops after the checks and print
 scripts/autodev-deliver.sh --issue 7 --apply  # also pushes the branch and opens the draft pull request
 ```
 
-The runner refuses before touching anything when the issue has no authorization record, the episode is not active, the task or project revision digest changed after authorization, the rebuilt agent input does not match, or the branch already has an open pull request. A change touching `.autodev/**` or `.github/workflows/**` labels the issue `autodev:human-needed` and stops.
+The runner refuses before touching anything when the issue has no authorization record, the episode is not active, the task or project revision digest changed after authorization, the rebuilt agent input does not match, or the branch already has an open pull request. A change touching a protected path labels the issue `autodev:human-needed` and stops. The list comes from the current project revision, not from the runner, so protecting one more path is a configuration change. `scripts/autodev-protected-paths.sh` turns those globs into the matching expression and `tests/protected_paths.rs` pins the conversion.
+
+The planning files are protected for a specific reason. Now that the committed plan is the plan, whoever can commit it can approve it, so the Agent is kept out of the Project Overview and the decision records. A human still edits them normally.
 
 Work happens in a scratch git worktree under the system temp directory, so the operator's checkout is never disturbed. The worktree is released when the run ends, and a run that pushed nothing also deletes its branch, so the same episode can be claimed again. The engine log and the produced diff stay in the workspace, whose path is printed on exit.
 
@@ -104,4 +106,3 @@ These belong to the remaining verification bullets on the delivery and controlle
 - Re-evaluating an already authorized blocked issue when its dependency merges. Today the operator runs the delivery command again.
 - Serialization between an issue event and a pull request event for the same episode. Their concurrency groups differ, so the library's event identity and status guards are what keep a racing pair from corrupting the record.
 - Durable per-attempt evidence outside the local engine log.
-- Deriving the protected paths from the current project revision instead of hard-coding them in the runner.
