@@ -17,6 +17,8 @@ delivery:
   protected_paths:
     - ".autodev/**"
     - ".github/workflows/**"
+    - "docs/project-overview.md"
+    - "adr/**"
   required_checks:
     - ci
   review:

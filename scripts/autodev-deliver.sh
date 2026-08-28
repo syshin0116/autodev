@@ -86,8 +86,7 @@ scripts/autodev-agent-input.sh "$work/snapshot.json" "$association" > "$work/age
 [ "$(digest "$work/agent-input.md")" = "$(jq -r '.agent_input_sha256' "$work/episode.json")" ] \
   || fail "the agent input no longer matches the authorized digest"
 
-base=$(cargo run --locked --quiet -- --print-project-revision . \
-  | jq -r '.projection.delivery.base_branch')
+base=$(jq -r '.project_revision.projection.delivery.base_branch' "$work/snapshot.json")
 
 # A dependency releases this task only when its own episode reached the merged
 # terminal state, so an unfinished predecessor blocks instead of racing.
@@ -122,8 +121,7 @@ if [ -n "$pull" ]; then
     --jq '[.[] | select(.state == "FAILURE" or .state == "ERROR" or .state == "TIMED_OUT" or .state == "CANCELLED") | .name] | sort | join(",")')
   [ -n "$failing" ] || { echo "pull request #$pull_number has no failing check to correct."; exit 0; }
   signature=$(printf '%s' "$failing" | shasum -a 256 | cut -d' ' -f1)
-  budget=$(cargo run --locked --quiet -- --print-project-revision . \
-    | jq -r '.projection.delivery.correction_budget')
+  budget=$(jq -r '.project_revision.projection.delivery.correction_budget' "$work/snapshot.json")
   scripts/autodev-comment-record.sh read "$repository" "$issue" \
     '<!-- autodev:attempts -->' attempts > "$work/attempts.json"
   used=$(jq --argjson g "$generation" \
@@ -218,10 +216,19 @@ if [ -s "$question" ]; then
   exit 0
 fi
 
-changed=$(git -C "$tree" status --porcelain | awk '{print $NF}')
-[ -n "$changed" ] || fail "the engine produced no change"
+scripts/autodev-changed-paths.sh "$tree" > "$work/changed.txt"
+[ -s "$work/changed.txt" ] || fail "the engine produced no change"
 
-protected=$(printf '%s\n' "$changed" | grep -E '^(\.autodev/|\.github/workflows/)' || true)
+protected_pattern=$(jq -r '.project_revision.projection.delivery.protected_paths[]' "$work/snapshot.json" \
+  | scripts/autodev-protected-paths.sh)
+# grep exits 1 for no match and 2 or more for a real failure, and a failure
+# here must stop delivery rather than read as nothing protected.
+set +e
+protected=$(grep -E "$protected_pattern" "$work/changed.txt")
+protected_status=$?
+set -e
+[ "$protected_status" -le 1 ] \
+  || fail "the protected path check failed with status $protected_status"
 if [ -n "$protected" ]; then
   echo "$protected" >&2
   gh issue edit "$issue" --repo "$repository" --add-label "autodev:human-needed"
@@ -256,7 +263,7 @@ if [ "$apply" != true ]; then
     echo "Would push branch: $branch"
   fi
   echo "Would open a draft pull request titled: $title"
-  printf '%s\n' "$changed" | sed 's/^/  changed: /'
+  sed 's/^/  changed: /' "$work/changed.txt"
   echo "Re-run with --apply to perform these writes."
   exit 0
 fi
