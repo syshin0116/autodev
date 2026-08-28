@@ -81,6 +81,39 @@ fn a_globstar_between_slashes_matches_zero_directories() {
     assert!(!matches(&patterns, "other/README.md"));
 }
 
+// A leading globstar has to reach the repository root, or a policy naming
+// **/README.md would protect every README except the one at the top.
+#[test]
+fn a_leading_globstar_reaches_the_repository_root() {
+    let patterns = ["**/README.md"];
+    assert!(matches(&patterns, "README.md"));
+    assert!(matches(&patterns, "docs/README.md"));
+    assert!(matches(&patterns, "docs/guide/README.md"));
+    assert!(!matches(&patterns, "README.md.bak"));
+}
+
+// The conversion parks globstars on a sentinel, so a pattern carrying that
+// sentinel would be rewritten into a pattern nobody approved.
+#[test]
+fn a_pattern_containing_the_sentinel_is_refused() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let mut child = Command::new(root.join("scripts/autodev-protected-paths.sh"))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("run the script");
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin")
+        .write_all(b"foo@@GLOBSTARDIR@@bar")
+        .expect("write pattern");
+    let output = child.wait_with_output().expect("collect output");
+    assert!(!output.status.success());
+    assert!(output.stdout.is_empty());
+}
+
 #[test]
 fn an_empty_list_is_refused_instead_of_matching_nothing() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));

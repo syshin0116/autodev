@@ -17,13 +17,13 @@ trap 'rm -f "$raw"' EXIT
   git -C "$tree" ls-files -z --others --exclude-standard
 } > "$raw"
 
-records=$(tr -cd '\0' < "$raw" | wc -c | tr -d ' ')
-paths=$(tr '\0' '\n' < "$raw" | sed '/^$/d')
-[ -z "$paths" ] && { [ "$records" = "0" ] || { echo "a changed path is empty" >&2; exit 1; }; exit 0; }
+# Git separates these paths with NUL and never with a newline, so any newline
+# byte here came from inside a name. Such a name cannot be listed one per line,
+# and a truncated half would be checked against the protected paths instead of
+# the real name.
+if [ "$(tr -cd '\n' < "$raw" | wc -c | tr -d ' ')" != "0" ]; then
+  echo "a changed path contains a newline and cannot be checked safely" >&2
+  exit 1
+fi
 
-# A newline inside a name would split one path into two lines, and the second
-# half would be checked against the protected paths instead of the real name.
-[ "$records" = "$(printf '%s\n' "$paths" | wc -l | tr -d ' ')" ] \
-  || { echo "a changed path contains a newline and cannot be checked safely" >&2; exit 1; }
-
-printf '%s\n' "$paths"
+tr '\0' '\n' < "$raw" | sed '$ { /^$/d; }'

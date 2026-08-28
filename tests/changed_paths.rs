@@ -79,9 +79,24 @@ fn a_clean_worktree_lists_nothing() {
 fn a_path_with_a_newline_is_refused() {
     let tree = repository("newline");
     fs::write(tree.join("adr/two\nlines.md"), "three\n").expect("write");
+    assert_refused(&tree);
+    fs::remove_dir_all(&tree).ok();
+}
+
+// A newline at either end used to survive, because dropping the empty line it
+// produced left a truncated name that still counted as one record.
+#[test]
+fn a_path_with_a_boundary_newline_is_refused() {
+    let tree = repository("boundary");
+    fs::write(tree.join("adr/trailing\n"), "four\n").expect("write");
+    assert_refused(&tree);
+    fs::remove_dir_all(&tree).ok();
+}
+
+fn assert_refused(tree: &Path) {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let output = Command::new(root.join("scripts/autodev-changed-paths.sh"))
-        .arg(&tree)
+        .arg(tree)
         .output()
         .expect("run the changed paths script");
     assert!(!output.status.success());
@@ -90,5 +105,4 @@ fn a_path_with_a_newline_is_refused() {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    fs::remove_dir_all(&tree).ok();
 }
