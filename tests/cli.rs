@@ -87,6 +87,40 @@ fn a_task_snapshot_requires_a_root_and_a_positive_issue() {
 }
 
 #[test]
+fn kaneo_projection_commands_require_fresh_mcp_input() {
+    assert_eq!(
+        parse(&[
+            "--print-kaneo-task-projection",
+            "--root",
+            ".",
+            "--input",
+            "kaneo.json",
+        ]),
+        CliCommand::PrintKaneoTaskProjection {
+            root: PathBuf::from("."),
+            input: PathBuf::from("kaneo.json"),
+        }
+    );
+    assert_eq!(
+        parse(&[
+            "--validate-kaneo-task-projection",
+            "--root",
+            ".",
+            "--input",
+            "kaneo.json",
+        ]),
+        CliCommand::ValidateKaneoTaskProjection {
+            root: PathBuf::from("."),
+            input: PathBuf::from("kaneo.json"),
+        }
+    );
+    assert_eq!(
+        error(&["--validate-kaneo-task-projection", "--root", "."]),
+        "--validate-kaneo-task-projection requires --input"
+    );
+}
+
+#[test]
 fn authorization_reads_the_event_agent_input_and_optional_prior_record() {
     assert_eq!(
         parse(&[

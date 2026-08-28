@@ -31,7 +31,7 @@ jobs:
         run: cargo test --locked --all-targets
       # The rootless project revision reads only repos/{owner}/{repo}, so this
       # step needs a read-only GitHub token for the gh CLI and nothing else.
-      - name: Validate the approved planning revision
+      - name: Validate the committed planning state
         env:
           GH_TOKEN: ${{ github.token }}
         run: cargo run --locked --quiet -- .

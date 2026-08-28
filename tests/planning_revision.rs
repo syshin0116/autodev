@@ -23,7 +23,7 @@ type ApiResponses = BTreeMap<(String, bool), Value>;
 static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 #[test]
-fn cli_accepts_an_exactly_approved_local_project_without_writes() {
+fn cli_accepts_a_committed_local_project_without_writes() {
     let project = TempProject::from_template();
     let before = snapshot_tree(project.root());
 
@@ -97,43 +97,34 @@ fn local_source_rejects_invalid_task_graphs() {
 }
 
 #[test]
-fn local_source_rejects_missing_pending_or_changed_approval() {
-    let missing = TempProject::from_template();
-    fs::remove_file(missing.root().join(".autodev/approval.yaml")).expect("remove approval");
-    assert_local_error(&missing, "approval record is missing");
-
-    let pending = TempProject::from_template();
-    replace_in(
-        &pending.root().join(".autodev/approval.yaml"),
-        "status: approved",
-        "status: pending",
-    );
-    assert_local_error(&pending, "status must be approved");
-
+fn local_source_rejects_uncommitted_planning_changes() {
     let changed_overview = TempProject::from_template();
     fs::write(
         changed_overview.root().join("docs/project-overview.md"),
         format!(
-            "{}\nChanged after approval.\n",
+            "{}\nChanged before execution.\n",
             read(&changed_overview.root().join("docs/project-overview.md"))
         ),
     )
     .expect("change overview");
     assert_local_error(
         &changed_overview,
-        "approved planning file changed: docs/project-overview.md",
+        "planning files differ from committed Git state",
     );
 
     let changed_tasks = TempProject::from_template();
     fs::write(
         changed_tasks.root().join("tasks.yaml"),
         format!(
-            "{}# changed after approval\n",
+            "{}# changed before execution\n",
             read(&changed_tasks.root().join("tasks.yaml"))
         ),
     )
     .expect("change tasks");
-    assert_local_error(&changed_tasks, "approved planning file changed: tasks.yaml");
+    assert_local_error(
+        &changed_tasks,
+        "planning files differ from committed Git state",
+    );
 }
 
 #[test]
@@ -291,10 +282,9 @@ fn rootless_project_revision_binds_policy_but_not_operational_engine_selection()
         project_revision_with_api(changed.root(), &rootless_project_api).expect("changed revision");
     assert_ne!(baseline.sha256, changed.sha256);
 
-    approve_rootless_project(project.root(), &baseline.sha256);
     assert_eq!(
         validate_with_api(project.root(), &rootless_project_api)
-            .expect("approved project revision"),
+            .expect("committed project revision"),
         None
     );
     replace_in(
@@ -307,7 +297,7 @@ fn rootless_project_revision_binds_policy_but_not_operational_engine_selection()
     assert!(
         error
             .to_string()
-            .contains("approved project revision changed"),
+            .contains("planning files differ from committed Git state"),
         "{error}"
     );
 }
@@ -316,7 +306,7 @@ fn rootless_project_revision_binds_policy_but_not_operational_engine_selection()
 fn task_snapshot_is_scoped_to_one_raw_issue_and_its_dependencies() {
     use std::cell::RefCell;
 
-    let project = approved_rootless_project();
+    let project = committed_rootless_project();
     let responses = rootless_task_fixture();
     let calls = RefCell::new(Vec::new());
     let api = |endpoint: &str, paginated: bool| {
@@ -415,7 +405,7 @@ fn task_snapshot_is_scoped_to_one_raw_issue_and_its_dependencies() {
 
 #[test]
 fn authorization_keeps_raw_and_agent_digests_and_serializes_generations() {
-    let project = approved_rootless_project();
+    let project = committed_rootless_project();
     let responses = rootless_task_fixture();
     let snapshot = task_snapshot_with_api(project.root(), 21, &fake_github_api(&responses))
         .expect("task snapshot");
@@ -683,7 +673,7 @@ fn episode_transitions_require_the_bound_roles_and_keep_merge_terminal() {
         EpisodeStatus::SupersessionPending
     );
     assert!(superseded.cleanup_required);
-    let replacement_project = approved_rootless_project();
+    let replacement_project = committed_rootless_project();
     let mut replacement_responses = rootless_task_fixture();
     replacement_responses
         .get_mut(&("repos/example/autodev/issues/21".into(), false))
@@ -807,7 +797,7 @@ fn episode_transitions_require_the_bound_roles_and_keep_merge_terminal() {
 }
 
 #[test]
-fn approved_project_change_requires_cleanup_before_the_next_generation() {
+fn committed_project_change_requires_cleanup_before_the_next_generation() {
     let (old_project, authorization) = authorized_rootless_task();
     let changed = rootless_project();
     replace_in(
@@ -817,7 +807,7 @@ fn approved_project_change_requires_cleanup_before_the_next_generation() {
     );
     let new_project = project_revision_with_api(changed.root(), &rootless_project_api)
         .expect("changed project revision");
-    approve_rootless_project(changed.root(), &new_project.sha256);
+    changed.commit("Change project policy");
     let replacement = task_snapshot_with_api(
         changed.root(),
         21,
@@ -868,7 +858,7 @@ fn approved_project_change_requires_cleanup_before_the_next_generation() {
 
 #[test]
 fn dependencies_require_verified_evidence_merged_into_the_task_base() {
-    let project = approved_rootless_project();
+    let project = committed_rootless_project();
     let snapshot = task_snapshot_with_api(
         project.root(),
         21,
@@ -962,7 +952,7 @@ fn planning_transition_must_follow_a_known_local_task() {
             "tasks:\n",
         ),
     );
-    approve_local(valid.root());
+    valid.commit("Add planning transition");
     let no_github =
         |_endpoint: &str, _paginated: bool| -> autodev_planning_revision::Result<Value> {
             panic!("local validation must not call GitHub")
@@ -983,7 +973,6 @@ fn planning_transition_must_follow_a_known_local_task() {
             "tasks:\n",
         ),
     );
-    approve_local(unknown.root());
     assert_local_error(
         &unknown,
         "required_planning_transition must name a known task",
@@ -1008,9 +997,8 @@ fn github_projection_preserves_recursive_order_dependencies_and_golden_digest() 
     assert_eq!(before_projection, snapshot_tree(project.root()));
     assert!(!project.root().join("tasks.yaml").exists());
 
-    approve_github(project.root(), &output.sha256);
     let before_validation = snapshot_tree(project.root());
-    let validated = validate_with_api(project.root(), &api).expect("approved GitHub revision");
+    let validated = validate_with_api(project.root(), &api).expect("current GitHub revision");
     assert_eq!(validated, Some(output.clone()));
     assert_eq!(before_validation, snapshot_tree(project.root()));
 
@@ -1019,15 +1007,12 @@ fn github_projection_preserves_recursive_order_dependencies_and_golden_digest() 
         .get_mut(&("repos/example/autodev/issues/10".into(), false))
         .and_then(Value::as_object_mut)
         .expect("root issue")
-        .insert("title".into(), json!("Changed after approval"));
+        .insert("title".into(), json!("Changed task"));
     let changed_api = fake_github_api(&changed);
-    let error = validate_with_api(project.root(), &changed_api).expect_err("stale approval");
-    assert!(
-        error
-            .to_string()
-            .contains("does not match the current GitHub Issue Graph"),
-        "{error}"
-    );
+    let changed = validate_with_api(project.root(), &changed_api)
+        .expect("fresh external task state")
+        .expect("rooted projection");
+    assert_ne!(output.sha256, changed.sha256);
 }
 
 #[test]
@@ -1335,11 +1320,11 @@ esac
 }
 
 #[test]
-fn issue_template_uses_the_approval_bound_sections_without_checkboxes() {
+fn issue_template_uses_the_task_contract_sections_without_checkboxes() {
     let template =
         read(&Path::new(env!("CARGO_MANIFEST_DIR")).join(".github/ISSUE_TEMPLATE/autodev-task.md"));
     assert!(template.contains("name: Autodev task"));
-    assert!(template.contains("about: Define one approval-bound task outcome"));
+    assert!(template.contains("about: Define one task outcome"));
     for heading in ["Outcome", "Planning references", "Verification"] {
         assert_eq!(
             template.matches(&format!("## {heading}\n")).count(),
@@ -1355,27 +1340,27 @@ fn issue_template_uses_the_approval_bound_sections_without_checkboxes() {
 #[test]
 fn captured_skill_artifacts_keep_the_planning_and_learning_contract() {
     let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let planning = manifest.join("test/fixtures/planning-skill/project");
+    let planning = TempProject::from_source(&manifest.join("test/fixtures/planning-skill/project"));
     let no_github =
         |_endpoint: &str, _paginated: bool| -> autodev_planning_revision::Result<Value> {
             panic!("local validation must not call GitHub")
         };
     assert_eq!(
-        validate_with_api(&planning, &no_github).expect("approved planning fixture"),
+        validate_with_api(planning.root(), &no_github).expect("committed planning fixture"),
         None
     );
-    let overview = read(&planning.join("docs/project-overview.md"));
+    let overview = read(&planning.root().join("docs/project-overview.md"));
     assert!(overview.contains("](../../knowledge/previous-autodev-retrospective.md)"));
     assert!(overview.contains("evidence, not authority"));
-    assert!(!planning.join("evidence").exists());
+    assert!(!planning.root().join("evidence").exists());
 
     let fixture = manifest.join("test/fixtures/execution-learning");
-    let project = fixture.join("project");
+    let project = TempProject::from_source(&fixture.join("project"));
     assert_eq!(
-        validate_with_api(&project, &no_github).expect("approved execution fixture"),
+        validate_with_api(project.root(), &no_github).expect("committed execution fixture"),
         None
     );
-    let rows = read(&project.join("source/volunteers.csv"))
+    let rows = read(&project.root().join("source/volunteers.csv"))
         .lines()
         .map(parse_csv_row)
         .collect::<Vec<_>>();
@@ -1391,14 +1376,25 @@ fn captured_skill_artifacts_keep_the_planning_and_learning_contract() {
             .collect::<Vec<_>>()
             .join("\n")
     );
-    assert_eq!(read(&project.join("output/check-in.md")), expected);
+    assert_eq!(read(&project.root().join("output/check-in.md")), expected);
 
-    let approval: LocalApprovalFixture = parse_yaml_file(&project.join(".autodev/approval.yaml"));
     let (evidence, evidence_body): (EvidenceFixture, _) =
-        parse_markdown(&project.join("evidence/build-check-in-sheet.md"));
+        parse_markdown(&project.root().join("evidence/build-check-in-sheet.md"));
     assert_eq!(evidence.task, "build-check-in-sheet");
     assert_eq!(evidence.status, "verified");
-    assert_eq!(evidence.planning_revision, approval.files);
+    assert_eq!(
+        evidence.planning_revision,
+        BTreeMap::from([
+            (
+                "docs/project-overview.md".to_owned(),
+                sha256_file(&project.root().join("docs/project-overview.md")),
+            ),
+            (
+                "tasks.yaml".to_owned(),
+                sha256_file(&project.root().join("tasks.yaml")),
+            ),
+        ])
+    );
     assert!(evidence.verified_at.contains('T'));
     assert!(evidence_body.contains("[Volunteer check-in sheet](../output/check-in.md)"));
 
@@ -1428,11 +1424,6 @@ fn captured_skill_artifacts_keep_the_planning_and_learning_contract() {
 }
 
 #[derive(Deserialize)]
-struct LocalApprovalFixture {
-    files: BTreeMap<String, String>,
-}
-
-#[derive(Deserialize)]
 struct EvidenceFixture {
     task: String,
     status: String,
@@ -1449,7 +1440,6 @@ struct CandidateFixture {
 fn assert_invalid_local_task(expected: &str, mutate: impl FnOnce(&Path)) {
     let project = TempProject::from_template();
     mutate(project.root());
-    approve_local(project.root());
     assert_local_error(&project, expected);
 }
 
@@ -1519,15 +1509,12 @@ fn rootless_project() -> TempProject {
     )
     .expect("write rootless config");
     fs::remove_file(project.root().join("tasks.yaml")).expect("remove local task source");
+    project.commit("Configure rootless task source");
     project
 }
 
-fn approved_rootless_project() -> TempProject {
-    let project = rootless_project();
-    let revision =
-        project_revision_with_api(project.root(), &rootless_project_api).expect("project revision");
-    approve_rootless_project(project.root(), &revision.sha256);
-    project
+fn committed_rootless_project() -> TempProject {
+    rootless_project()
 }
 
 fn rootless_project_api(
@@ -1545,29 +1532,6 @@ fn rootless_project_api(
             "project revision unexpectedly fetched {endpoint}"
         )))
     }
-}
-
-fn approve_rootless_project(root: &Path, project_sha256: &str) {
-    fs::write(
-        root.join(".autodev/approval.yaml"),
-        format!(
-            concat!(
-                "project: fixture\n",
-                "status: approved\n",
-                "approved_by: user\n",
-                "approved_at: \"2026-08-16T02:42:17+09:00\"\n",
-                "planning_revision:\n",
-                "  project_overview:\n",
-                "    path: docs/project-overview.md\n",
-                "    sha256: {}\n",
-                "  project:\n",
-                "    sha256: {}\n",
-            ),
-            sha256_file(&root.join("docs/project-overview.md")),
-            project_sha256,
-        ),
-    )
-    .expect("write rootless approval");
 }
 
 fn rootless_task_fixture() -> ApiResponses {
@@ -1692,7 +1656,7 @@ fn verified_evidence(authorization: &TaskAuthorization) -> VerifiedEvidence {
 }
 
 fn authorized_rootless_task() -> (ProjectRevisionOutput, TaskAuthorization) {
-    let project = approved_rootless_project();
+    let project = committed_rootless_project();
     let snapshot = task_snapshot_with_api(
         project.root(),
         21,
@@ -1724,33 +1688,8 @@ fn github_project() -> TempProject {
     )
     .expect("write GitHub config");
     fs::remove_file(project.root().join("tasks.yaml")).expect("remove local task source");
+    project.commit("Configure rooted GitHub task source");
     project
-}
-
-fn approve_github(root: &Path, projection_sha256: &str) {
-    fs::write(
-        root.join(".autodev/approval.yaml"),
-        format!(
-            concat!(
-                "project: fixture\n",
-                "status: approved\n",
-                "approved_by: user\n",
-                "approved_at: \"2026-08-10T20:00:00+09:00\"\n",
-                "planning_revision:\n",
-                "  project_overview:\n",
-                "    path: docs/project-overview.md\n",
-                "    sha256: {}\n",
-                "  task_source:\n",
-                "    type: github_issues\n",
-                "    repository: example/autodev\n",
-                "    root_issue: 10\n",
-                "    sha256: {}\n",
-            ),
-            sha256_file(&root.join("docs/project-overview.md")),
-            projection_sha256,
-        ),
-    )
-    .expect("write GitHub approval");
 }
 
 fn project_github(
@@ -1996,27 +1935,40 @@ struct TempProject {
 
 impl TempProject {
     fn from_template() -> Self {
-        let root = create_temp_dir();
-        copy_tree(
-            &Path::new(env!("CARGO_MANIFEST_DIR")).join("templates/project"),
-            &root,
-        );
+        let project =
+            Self::from_source(&Path::new(env!("CARGO_MANIFEST_DIR")).join("templates/project"));
         replace_in(
-            &root.join("docs/project-overview.md"),
+            &project.root.join("docs/project-overview.md"),
             "- Replace this line with unresolved material questions. Use `None.` only when none remain.",
             "None.",
         );
         replace_in(
-            &root.join("tasks.yaml"),
+            &project.root.join("tasks.yaml"),
             "project: replace-with-project-id",
             "project: fixture",
         );
-        approve_local(&root);
-        Self { root }
+        project.commit("Configure planning fixture");
+        project
+    }
+
+    fn from_source(source: &Path) -> Self {
+        let root = create_temp_dir();
+        copy_tree(source, &root);
+        run_git(&root, &["init", "--quiet"]);
+        run_git(&root, &["config", "user.email", "autodev@example.com"]);
+        run_git(&root, &["config", "user.name", "Autodev Test"]);
+        let project = Self { root };
+        project.commit("Add planning files");
+        project
     }
 
     fn root(&self) -> &Path {
         &self.root
+    }
+
+    fn commit(&self, message: &str) {
+        run_git(&self.root, &["add", "--all"]);
+        run_git(&self.root, &["commit", "--quiet", "-m", message]);
     }
 }
 
@@ -2059,24 +2011,19 @@ fn copy_tree(source: &Path, destination: &Path) {
     }
 }
 
-fn approve_local(root: &Path) {
-    fs::write(
-        root.join(".autodev/approval.yaml"),
-        format!(
-            concat!(
-                "project: fixture\n",
-                "status: approved\n",
-                "approved_by: user\n",
-                "approved_at: \"2026-08-10T20:00:00+09:00\"\n",
-                "files:\n",
-                "  docs/project-overview.md: {}\n",
-                "  tasks.yaml: {}\n",
-            ),
-            sha256_file(&root.join("docs/project-overview.md")),
-            sha256_file(&root.join("tasks.yaml")),
-        ),
-    )
-    .expect("write local approval");
+fn run_git(root: &Path, arguments: &[&str]) {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(arguments)
+        .output()
+        .expect("run git");
+    assert!(
+        output.status.success(),
+        "git {:?}: {}",
+        arguments,
+        String::from_utf8_lossy(&output.stderr)
+    );
 }
 
 fn sha256_file(path: &Path) -> String {
@@ -2106,6 +2053,9 @@ fn snapshot_tree(root: &Path) -> BTreeMap<PathBuf, TreeEntry> {
             .expect("read project entries");
         children.sort_by_key(|entry| entry.file_name());
         for child in children {
+            if child.file_name() == ".git" {
+                continue;
+            }
             let path = child.path();
             let relative = path
                 .strip_prefix(root)
@@ -2140,11 +2090,6 @@ fn replace_in(path: &Path, from: &str, to: &str) {
 
 fn read(path: &Path) -> String {
     fs::read_to_string(path).unwrap_or_else(|error| panic!("read {}: {error}", path.display()))
-}
-
-fn parse_yaml_file<T: for<'de> Deserialize<'de>>(path: &Path) -> T {
-    yaml_serde::from_str(&read(path))
-        .unwrap_or_else(|error| panic!("parse {}: {error}", path.display()))
 }
 
 fn parse_markdown<T: for<'de> Deserialize<'de>>(path: &Path) -> (T, String) {

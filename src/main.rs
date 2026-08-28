@@ -1,8 +1,9 @@
 use autodev_planning_revision::{
     CliCommand, DependencyStatus, EpisodeEvent, ReadyEvent, Result, TaskAuthorization,
     ValidationError, VerifiedEvidence, authorize_task_with_api, complete_episode_merge,
-    dependencies_ready, parse_cli, project_revision, request_github, task_snapshot,
-    task_source_projection, transition_episode_with_api, validate,
+    dependencies_ready, kaneo_task_projection, parse_cli, project_revision, request_github,
+    task_snapshot, task_source_projection, transition_episode_with_api, validate,
+    validate_kaneo_task_projection,
 };
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -43,6 +44,15 @@ fn run(command: CliCommand) -> Result<String> {
                 })
             })
             .and_then(json),
+        CliCommand::PrintKaneoTaskProjection { root, input } => {
+            let input = read_json(&input, "Kaneo task projection input")?;
+            kaneo_task_projection(&root, input).and_then(json)
+        }
+        CliCommand::ValidateKaneoTaskProjection { root, input } => {
+            let input = read_json(&input, "Kaneo task projection input")?;
+            validate_kaneo_task_projection(&root, input)
+                .map(|_| "Planning revision valid.".to_owned())
+        }
         CliCommand::PrintTaskSnapshot { root, issue } => task_snapshot(&root, issue).and_then(json),
         CliCommand::Authorize {
             root,

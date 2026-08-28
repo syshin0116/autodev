@@ -17,7 +17,7 @@ The first adapter turns one authorized issue into a draft pull request. GitHub d
 `autodev-authorize.yml` is the trusted controller. It runs from the default branch on `issues: labeled`, holds `contents: read` and `issues: write`, runs no engine, and writes no code. Every event value reaches its shell through the environment, so issue text cannot become script.
 
 1. Resolve the actor's repository role through the collaborators API.
-2. Read the approved task snapshot with `--print-task-snapshot`, which fails closed without the approved ready label.
+2. Read the authorized task snapshot with `--print-task-snapshot`, which fails closed without the configured ready label.
 3. Build the integrity-filtered agent input and the `ReadyEvent`.
 4. Call `--authorize` with the prior authorization record.
 5. Persist the returned record before any side effect.
@@ -33,7 +33,7 @@ Delivery therefore advances only while the operator runs the command. [ADR 0007]
 
 Pull request closure arrives as `pull_request_target` so the workflow definition always comes from the default branch, and the workflow never checks out or runs pull request code.
 
-- A merged pull request completes the episode as `merged`, which is absorbing. Completion requires the approved base branch and every required check passing on that pull request, so a merge that skipped the gates cannot claim success.
+- A merged pull request completes the episode as `merged`, which is absorbing. Completion requires the configured base branch and every required check passing on that pull request, so a merge that skipped the gates cannot claim success.
 - Closing the issue is also how a merge reports itself, so an issue closure is a no-op when the episode's branch already has a merged pull request. Success does not abandon itself.
 - Ready-label removal, issue closure, and closing the pull request unmerged abandon the episode when the actor holds a cancel role. Any other actor only fails that gate, and nothing is written.
 - An issue edit by an authorizer supersedes the episode. Cleanup then closes its pull request and deletes its branch, and reapplying `autodev:ready` records the replacement digests and starts the next generation in the same run.
@@ -47,7 +47,7 @@ The durable record is one comment on the issue, marked with `<!-- autodev:author
 
 `scripts/autodev-comment-record.sh` reads and writes every marked state comment, including the attempt record, with `scripts/autodev-episode-record.sh` and `scripts/autodev-record-write.sh` as the authorization-record wrappers used by both controllers and the runner, and `tests/episode_record.rs` covers a writer to reader round trip, a record on a later comment page, an issue with no record, and a damaged record that must fail instead of looking like a first authorization.
 
-The comment is a carrier, not authority. It holds no approval-bound planning content, so editing it cannot change what was approved; a tampered record produces a decision that fails its own gate. Per-issue serialization comes from the workflow concurrency group `autodev-episode-<issue>`, which never cancels a run in progress.
+The comment is a carrier, not authority. Editing it cannot change committed planning or the authorized task snapshot; a tampered record produces a decision that fails its own gate. Per-issue serialization comes from the workflow concurrency group `autodev-episode-<issue>`, which never cancels a run in progress.
 
 ## Agent input
 
@@ -59,7 +59,7 @@ The controller and the runner both call that script, so the runner can compare i
 
 A task issue's native blocking relationships are its dependencies. The runner refuses to start while any of them is incomplete, and labels the issue `autodev:blocked`. The label is a report, not the state: `scripts/autodev-dependency-status.sh` derives each dependency's status from that dependency's own authorization record, so a hand-applied or hand-removed label changes nothing.
 
-A dependency counts as complete only when its record reached the merged terminal state with the approved base branch. An authorized but unfinished dependency, and one nobody authorized at all, both get a status that fails the check, because the readiness rule requires exactly one status per declared dependency.
+A dependency counts as complete only when its record reached the merged terminal state with the configured base branch. An authorized but unfinished dependency, and one nobody authorized at all, both get a status that fails the check, because the readiness rule requires exactly one status per declared dependency.
 
 ## Questions
 
@@ -75,7 +75,7 @@ When the episode's branch already has an open pull request, the run becomes a co
 
 Three things stop it, each recorded rather than inferred:
 
-- the approved correction budget for that authorization generation is spent
+- the configured correction budget for that authorization generation is spent
 - the same normalized failure signature appears again on an unchanged head, which means the last attempt made no progress
 - no check is failing, in which case there is nothing to correct
 
@@ -104,4 +104,4 @@ These belong to the remaining verification bullets on the delivery and controlle
 - Re-evaluating an already authorized blocked issue when its dependency merges. Today the operator runs the delivery command again.
 - Serialization between an issue event and a pull request event for the same episode. Their concurrency groups differ, so the library's event identity and status guards are what keep a racing pair from corrupting the record.
 - Durable per-attempt evidence outside the local engine log.
-- Deriving the protected paths from the approved project revision instead of hard-coding them in the runner.
+- Deriving the protected paths from the current project revision instead of hard-coding them in the runner.
