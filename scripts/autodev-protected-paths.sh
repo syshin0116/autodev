@@ -18,6 +18,14 @@ if printf '%s' "$patterns" | grep -q '@@GLOBSTAR'; then
   exit 1
 fi
 
+# Changed paths are repository-relative, so an absolute or parent-traversing
+# pattern would compile into a regex that can never match. A typo must not
+# silently switch the protection off.
+if printf '%s' "$patterns" | grep -qE '^/|(^|/)\.\.(/|$)'; then
+  echo "a protected path must be relative to the repository root" >&2
+  exit 1
+fi
+
 # `**` is a whole path segment. Anything else using it, such as a**b or a
 # repeated **/**/, is refused rather than compiled into a pattern that quietly
 # covers less than it reads like.

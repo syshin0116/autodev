@@ -138,6 +138,30 @@ fn an_unsupported_globstar_shape_is_refused() {
     }
 }
 
+// Changed paths are repository-relative, so these compile into a pattern that
+// can never match. A typo must fail loudly instead of switching protection off.
+#[test]
+fn a_pattern_outside_the_repository_is_refused() {
+    for pattern in ["/adr/**", "../adr/**", "docs/../adr/**"] {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let mut child = Command::new(root.join("scripts/autodev-protected-paths.sh"))
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("run the script");
+        child
+            .stdin
+            .as_mut()
+            .expect("stdin")
+            .write_all(pattern.as_bytes())
+            .expect("write pattern");
+        let output = child.wait_with_output().expect("collect output");
+        assert!(!output.status.success(), "{pattern}");
+        assert!(output.stdout.is_empty(), "{pattern}");
+    }
+}
+
 #[test]
 fn an_empty_list_is_refused_instead_of_matching_nothing() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
