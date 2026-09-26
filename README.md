@@ -109,6 +109,9 @@ A valid revision prints `Planning revision valid.` Kaneo uses its fresh-projecti
 | Document | Contents |
 |---|---|
 | [Project Overview](docs/project-overview.md) | Goal, boundaries, current decisions, and proposed work |
+| [Knowledge product plan](docs/knowledge-product-plan.md) | Situational know-how, reusable assets, native-first retrieval with promotion conditions |
+| [Knowledge implementation design](docs/knowledge-implementation-design.md) | File contracts, lookup bindings, relation records, and implementation slices |
+| [LLM Wiki proposal](docs/40-llm-wiki.md) | Maintained knowledge, ingest and query workflows, and Kaneo decision records |
 | [Autodev Skill](SKILL.md) | Host-facing phase router and shared boundaries |
 | [Phase guides](references/) | Planning, execution, and learning behavior loaded when needed |
 | [Planning Revision Validation](docs/20-capability-contracts/planning-revision-validation.md) | Local, GitHub, and Kaneo task-source validation contract |
