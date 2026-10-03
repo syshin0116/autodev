@@ -70,6 +70,43 @@ dev-knowledge (vault, Obsidian으로 연다)               autodev (도구)
 
 각 기기가 vault를 clone하고 git으로 동기화한다. 기기마다 다른 것은 세션 큐, `lookups/`의 기기별 파일, 그리고 (승격 후의) 파생 인덱스뿐이다. 하나의 기기만 config에서 `primary = true`이고, radar 판정과 주간 통합은 primary에서만 돈다. capture는 세션이 그 기기에 있으므로 모든 기기에서 돈다.
 
+### vault 두 개: 개인과 업무
+
+| vault | 저장소 | 공개 범위 | 받는 원천 |
+| --- | --- | --- | --- |
+| `personal` | dev-knowledge | 공개 | `~/Documents/github/personal/` 아래 세션, 개인 저장소 PR, radar |
+| `work` | 업무용 비공개 저장소 (12절) | 비공개 | Linear `[SKAX]AI PMO`, `[SKT] AgentQA`에서 사용자가 담당하거나 만든 이슈 |
+
+두 vault는 같은 스키마, 같은 브랜치 구조, 같은 도구를 쓴다. 다른 것은 원천과 공개 범위뿐이다. 업무 원천의 내용은 `personal`로 자동으로 흘러가지 않는다. 업무에서 얻은 일반 교훈을 개인 vault에 두려면 고객 식별 정보를 뺀 새 페이지를 사람이 PR로 올린다. 브리프는 작업 위치로 vault를 고른다. 개인 저장소에서는 `personal`만, 업무 저장소에서는 `work`와 `personal`을 함께 읽는다.
+
+`personal`은 공개 저장소이므로 `intake`에 쓰기 전에 두 가지를 거친다. 비밀 스캐너(gitleaks)가 걸리면 push하지 않고 다이제스트에 보고한다. 홈 디렉터리 경로와 내부 호스트명은 치환한다. capture 지침은 고객사와 업무 저장소 이름을 쓰지 않게 하지만, 이것은 지침일 뿐이라 스캐너가 마지막 방어선이다.
+
+### 커넥터
+
+경험이 들어오는 원천과 결정이 보이는 표면은 커넥터로 붙인다. 어떤 조합이든 config에서 고른다.
+
+| 종류 | 역할 | v1 커넥터 |
+| --- | --- | --- |
+| 원천 | 경험을 `inbox/` 후보로 만든다 | 세션(훅), GitHub PR·Actions, Linear 이슈, Kaneo 태스크 |
+| 표면 | 결정 항목을 보여 주고 알린다 | macOS 알림, GitHub, Linear, Kaneo |
+
+```toml
+[[sources]]
+kind = "linear"
+vault = "work"
+projects = ["[SKAX]AI PMO", "[SKT] AgentQA"]
+participation = ["assignee", "creator"]
+
+[[surfaces]]
+kind = "kaneo"
+project = "autodev"
+```
+
+- 커넥터는 Agent Host의 MCP 연결(Linear, Kaneo)이나 기존 CLI(`gh`)를 쓴다. autodev는 서버를 설치하거나 인증하거나 자격 증명을 저장하지 않는다.
+- 커넥터 하나는 `references/connectors/<kind>.md` 한 문서다. 무엇을 읽는지, 어떤 필터를 쓰는지, 항목을 어떻게 만들고 닫는지를 적는다. 새 커넥터는 문서 하나와 config 블록 하나로 붙는다.
+- 결정의 정본은 vault PR 하나다. 표면은 열린 결정 PR의 링크와 상태를 미러링할 뿐 결정을 받지 않는다. 그래야 표면을 바꾸거나 여러 개 붙여도 결정이 갈라지지 않는다. 미러 항목은 PR URL을 키로 하나만 만들고, PR이 닫히면 함께 닫는다. 아직 PR에 들어가지 않은 radar 후보는 미러링하지 않고 다이제스트에만 제목으로 나온다.
+- 표면이 닿지 않는 날은 그 표면만 건너뛴다. 다이제스트 파일과 macOS 알림은 항상 남는다.
+
 ## 3. 지식 단위와 프론트매터
 
 검색과 인용의 단위는 한 상황을 다루는 H2 절이다. 절은 혼자 읽혀야 하므로 첫 문장에서 주어를 대명사로 받지 않고 다시 쓴다. 페이지는 500줄을 넘지 않고, 한 주제라도 `type`이 다르면 페이지를 나눈다.
@@ -158,13 +195,13 @@ related: []
 
 보존 범위를 정확히 적는다. autodev는 전사 원본을 보관하지 않는다. 세션 JSONL은 형식이 버전마다 바뀌고 Claude Code는 기본 30일 뒤 지운다. 대신 capture는 노트의 `Observed` 절에 명령, 오류 출력, 결정 문장을 요약하지 않고 발췌로 옮기고, 같은 작업의 커밋·PR·Actions 실행을 영속 참조로 연결한다. 위키 페이지의 근거는 이 발췌와 영속 참조다.
 
-대상은 config의 `capture.roots`(기본값 `~/Documents/github/personal/`) 아래 cwd에서 열린 세션만이다. 업무 저장소의 세션은 개인 vault로 들어오지 않는다.
+대상은 config의 `capture.roots`(기본값 `~/Documents/github/personal/`) 아래 cwd에서 열린 세션만이다. 업무 경험은 세션이 아니라 Linear 원천 커넥터로 `work` vault에 들어온다(2절).
 
 ### 4.2 작업 시작 → 브리프 (brief)
 
 실행 에이전트는 위키를 직접 읽지 않고 브리프만 받는다. 위키를 실행 에이전트에게까지 준 조건이 제안자에게만 준 조건보다 낮았다(63.7% 대 60.9%, 2608.27454). 다만 이 결과는 스킬을 진화시키는 도중의 조건이라 실제 작업 시점에 그대로 옮겨지는지는 확인되지 않았다. 이 분리를 두는 실질적 이유는 두 가지다. 컨텍스트 예산을 지키고, "무엇을 몰랐는가"가 세션에 남아 capture의 입력이 되게 한다.
 
-호출은 사람이 아니라 작업 에이전트가 한다. 설치 단계에서 두 엔진의 전역 지침(`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`)에 "capture.roots 아래에서 구현 작업을 시작할 때 autodev brief를 먼저 실행한다"는 한 줄을 추가한다(사용자 확인 후).
+호출은 사람이 아니라 작업 에이전트가 한다. 설치 단계에서 전역 지침 `~/.codex/AGENTS.md`에 "구현 작업을 시작할 때 autodev brief를 먼저 실행한다"는 한 줄을 추가한다. `~/.claude/CLAUDE.md`가 이 파일의 심볼릭 링크라서 두 엔진이 같은 줄을 읽는다. Claude Code는 v2.1.277부터 프로젝트의 `AGENTS.md`를 직접 읽지만 전역 `AGENTS.md`를 읽는다는 문서는 없으므로 이 링크가 필요하다. 링크가 없는 기기에서는 `~/.claude/CLAUDE.md`에 `@~/.codex/AGENTS.md` 한 줄을 넣는 것이 문서화된 대안이다.
 
 1. 브리프는 별도 프로세스(서브에이전트, 없으면 `claude -p`/`codex exec`)에서 만든다. 입력은 태스크 설명과 현재 저장소·브랜치다.
 2. `main` 기준 `index.md`를 읽고 5.1절 규칙대로 grep하고, 후보의 `status`, `stale_after`, `superseded_by`를 확인한다.
@@ -178,12 +215,14 @@ related: []
   head_sha: 9c1e2d4            # 조회 당시 작업 브랜치 HEAD
   pr: 17                       # 이미 있으면
   session: claude:0192f...     # 있으면
-  vault_sha: 3f2a9c1           # 조회 당시 main
+  vault_sha: {personal: 3f2a9c1}   # 조회 당시 각 vault의 main
   queries: ["ERR_PNPM_LOCKFILE", "lockfile", "잠금파일"]
-  candidates: [kb-20261005-pnpm-lockfile-v9, kb-20260912-ci-cache]
-  used: [kb-20261005-pnpm-lockfile-v9]
-  resolution: existed:kb-20261005-pnpm-lockfile-v9   # existed:<id> | none-needed | gap
+  candidates: [personal:kb-20261005-pnpm-lockfile-v9, personal:kb-20260912-ci-cache]
+  used: [personal:kb-20261005-pnpm-lockfile-v9]
+  resolution: existed:personal:kb-20261005-pnpm-lockfile-v9   # existed:<vault:id> | none-needed | gap
 ```
+
+페이지 참조는 `<vault>:<id>` 형식이다. 업무 저장소에서 한 조회는 질의어 자체가 업무 정보이므로 `work` vault의 `intake`에만 쓴다.
 
 이 기록이 못 찾은 질의 로그, 지식 사용 기록, 인덱스 승격 신호를 함께 맡는다. `resolution: gap`은 주간 통합이 확인해 같은 파일에 `resolves: <lookup_id>` 항목을 추가하는 방식으로 `existed:<id>`나 `written:<id>`로 확정한다. 기존 항목은 고치지 않는다. 파일을 기기별로 나눠 git 충돌을 피한다.
 
@@ -261,7 +300,7 @@ vault `AGENTS.md`의 검색 단락은 다음을 말한다.
 
 결정의 입력은 dev-knowledge의 PR 하나뿐이다. 주간 통합 PR(위키 후보와 radar 후보), 스킬 승격 PR, 그리고 `kb-lint --intake` 실패 같은 이상 보고가 그 대상이다. 승인은 병합, 거절과 보류는 PR 코멘트(4.3절)다. 결정이 `wiki/`의 `adoption`으로 남으므로 닫힌 항목이 다시 올라오지 않는다.
 
-`autodev digest`는 primary에서 하루 한 번 열린 결정 PR과 그날 들어온 radar 후보 제목을 요약해 macOS 알림과 `intake`의 `digest/YYYY-MM-DD.md`로 낸다. 각 항목은 "승인할까요?"가 아니라 질문 한 문장, 바뀌는 것, 틀리면 깨지는 것, 링크로 쓴다. 하루에 사람 앞에 놓이는 항목은 5건 이하다.
+`autodev digest`는 primary에서 하루 한 번 열린 결정 PR과 그날 들어온 radar 후보 제목을 요약해 `intake`의 `digest/YYYY-MM-DD.md`로 쓰고 macOS 알림을 보낸다. 표면 커넥터(2절)는 열린 결정 PR만 미러링한다. 각 항목은 "승인할까요?"가 아니라 질문 한 문장, 바뀌는 것, 틀리면 깨지는 것, 링크로 쓴다. 하루에 사람 앞에 놓이는 항목은 5건 이하다.
 
 ## 6. 측정
 
@@ -312,7 +351,7 @@ vault `AGENTS.md`의 검색 단락은 다음을 말한다.
 | autodev 스킬 | 없음. 두 엔진이 같은 SKILL.md를 읽는다. 설명은 짧게, 트리거 단어를 앞에 둔다 |
 | 세션 훅 | `hooks/claude-session-end.sh`, `hooks/codex-notify.sh` |
 | 비대화 실행 | `claude -p`/`codex exec`, resume 인자. `bin/` 공용 함수 하나에서 분기 |
-| 전역 지침 한 줄 | `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` |
+| 전역 지침 한 줄 | `~/.codex/AGENTS.md` 하나. Claude Code는 심볼릭 링크나 `@` import로 같은 파일을 읽는다 |
 
 새 엔진을 붙이는 일은 위 표의 아래 세 줄을 추가하는 일이어야 한다. 엔진 고유의 메모리 기능(Claude 자동 메모리, Codex memories)은 기기·엔진별이라 vault와 두 권위로 병존하면 낡은 쪽을 따르는 사례가 있었다. vault `AGENTS.md`가 정본임을 명시하고, 엔진 메모리에는 vault에 있는 내용을 쓰지 않는다.
 
@@ -321,8 +360,8 @@ vault `AGENTS.md`의 검색 단락은 다음을 말한다.
 | 단계 | 만드는 것 | 완료 기준 |
 | --- | --- | --- |
 | 1. 정리와 규약 | autodev: 1절 삭제, README·SKILL.md 골격, `schema/`, `kb-lint`와 테스트, CI 교체(job 이름 `ci` 유지), 이전 엔진 이슈(#7~#10) 정리. dev-knowledge: `intake` 브랜치, `main` ruleset과 CI, vault `AGENTS.md`, 기존 내용의 새 스키마 이행, `index.md` 생성 | 두 저장소의 `ci`가 통과하고, 고의로 깨뜨린 프론트매터 다섯 종류와 경로 위반 두 종류를 `kb-lint`가 각각 잡는다 |
-| 2. 경험 루프 | 훅 두 개, 세션 큐, `capture`, `brief`, 전역 지침 한 줄, `consolidate`, `metrics`, launchd 작업 | 개인 프로젝트 작업 2주분이 inbox에 들어오고, 통합 PR 한 건이 병합되며, 측정 표가 두 번 나오고 미조회 비율이 보고된다 |
-| 3. radar와 다이제스트 | 수집 워크플로, `pending/` 상태, `interests.yaml`, 판정 지침, `digest` | 2주 동안 하루 노출 3건·결정 5건 상한이 지켜지고, 수집이 하루 빠진 뒤 복구되며, 거절 사유가 `interests.yaml` 변경 제안으로 한 번 이상 나온다 |
+| 2. 경험 루프 | 훅 두 개, 세션 큐, `capture`(비밀 스캔 포함), `brief`, 전역 지침 한 줄, `consolidate`, `metrics`, launchd 작업, 원천 커넥터(GitHub, Linear) | 개인 프로젝트 작업 2주분이 inbox에 들어오고, 통합 PR 한 건이 병합되며, 측정 표가 두 번 나오고 미조회 비율이 보고된다 |
+| 3. radar와 다이제스트 | 수집 워크플로, `pending/` 상태, `interests.yaml`, 판정 지침, `digest`, 표면 커넥터(macOS, Kaneo, Linear) | 2주 동안 하루 노출 3건·결정 5건 상한이 지켜지고, 수집이 하루 빠진 뒤 복구되며, 거절 사유가 `interests.yaml` 변경 제안으로 한 번 이상 나온다 |
 | 4. 스킬 승격 | `evals/` 첫 세트, `bin/eval`, `skills/ledger.md`, 경로 거부 CI | 평가 세트가 스킬 없이 두 엔진에서 재현 가능하게 돌고, 후보 하나가 채택 또는 거부되어 장부에 남는다 |
 
 각 단계는 별도 PR이고, 단계마다 Codex 리뷰를 거친다.
@@ -337,7 +376,7 @@ vault `AGENTS.md`의 검색 단락은 다음을 말한다.
 | 세션마다 위키 통합 | 4절 |
 | 통과율만 보는 스킬 게이트, 개인 취향 스킬 | 4.4절. 개인 세션에서 뽑은 스킬은 이득이 작고 일관되지 않았다 |
 | 세션 JSONL 직접 파싱, 전사 보관 | 형식 불안정이 벤더 문서에 명시돼 있다. 근거는 발췌와 영속 참조로 남긴다 |
-| Kaneo 라벨을 결정 상태로 사용 | 라벨이 태스크별 복사본이라 공유 상태가 아니다. 결정 입력은 PR 하나다 |
+| 표면(Kaneo, Linear 등)에서 결정 받기 | 표면마다 결정이 갈라진다. Kaneo 라벨은 태스크별 복사본이라 공유 상태로도 쓸 수 없다. 결정 입력은 PR 하나다 |
 | 엔진 메모리를 지식 저장소로 사용 | 8절 |
 | Anthropic Dreaming, Letta sleep-time | 관리형·호스팅이라 git 정본과 맞지 않는다. 배치 통합 + 승인이라는 방향만 따른다 |
 
@@ -367,8 +406,7 @@ vault `AGENTS.md`의 검색 단락은 다음을 말한다.
 
 | 질문 | 막히는 단계 |
 | --- | --- |
-| dev-knowledge는 현재 공개 저장소다. inbox에 세션 발췌가 들어가기 전에 비공개로 바꿀지. 비공개면 Actions 무료 분량(월 약 2,000분)과 ruleset 사용 가능 여부를 확인해야 한다 | 1단계 |
-| 업무 프로젝트(brain-crew)의 경험을 받을지. 받는다면 별도 vault로 할지 | 2단계 |
-| 전역 지침(`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`)에 brief 호출 한 줄을 넣는 것 | 2단계 |
-| Kaneo를 결정 목록의 거울로 계속 쓸지. 이 설계에서는 PR과 macOS 알림만으로 닫힌다. 로컬 서비스라 이름 해석이나 네트워크 상태에 따라 닿지 않는 날이 있다(2026-10-03 확인) | 3단계 |
+| `work` vault를 어디에 둘지. 같은 PR 결정 흐름을 쓰려면 GitHub 비공개 저장소가 필요하다. 기존 brain-crew Obsidian vault는 원격이 없는 git이라 PR을 열 수 없다 | 2단계 |
 | Kaneo AUT 결정 기록 중 이 설계와 어긋나는 항목(공유 그래프, 실행 엔진 전제) 정정 | 1단계 전 |
+
+결정된 것(2026-10-03): `personal` vault는 공개로 유지한다. 업무 원천은 Linear의 두 프로젝트에서 사용자가 담당하거나 만든 이슈로 한정한다. brief 호출은 전역 지침 한 줄로 한다. 표면은 커넥터로 골라 붙인다.
