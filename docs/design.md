@@ -194,7 +194,7 @@ autodev가 띄우는 모든 엔진 호출은 `AUTODEV_INTERNAL=1` 환경에서 �
 
 훅 안에서 요약하지 않는 이유는 셋이다. Codex에는 세션 종료 이벤트가 없다. 요약 호출 자체가 다시 `SessionEnd`를 일으킨다. `transcript_path`는 비동기로 기록돼 훅 시점에 마지막 메시지가 빠질 수 있다.
 
-`bin/capture`는 마지막 활동 뒤 1시간이 지난 세션을 처리한다. Claude Code는 `claude -p --resume <id> --fork-session`으로 사용자 세션을 건드리지 않고 분기해서 요약하고, Codex는 `codex exec resume <id>`를 쓴다. 결과가 노트이면 push 뒤에, "기록할 것 없음"이면 그 판정을 큐에 남긴 뒤 완료로 표시한다. 실패만 다음 날 다시 시도한다.
+`bin/capture`는 마지막 활동 뒤 1시간이 지난 세션을 처리한다. Claude Code는 `claude -p --resume <id> --fork-session --tools "" --strict-mcp-config`로 사용자 세션을 건드리지 않고 도구 없이 분기해서 요약하고, Codex는 `codex exec resume <id>`를 쓴다. 세션에는 저장소 텍스트나 명령 출력처럼 신뢰할 수 없는 내용이 섞여 있으므로 capture는 요약만 출력하고, 파일 쓰기는 스크립트가 출력을 검증한 뒤 한다. Codex는 radar 채점과 같은 조건(5.3절)을 확인하기 전까지 capture도 도구 없는 설정으로 제한한다. 결과가 노트이면 push 뒤에, "기록할 것 없음"이면 그 판정을 큐에 남긴 뒤 완료로 표시한다. 실패만 다음 날 다시 시도한다.
 
 노트는 결정, 교훈, 못 찾은 것을 담고 `status: draft`, `adoption: candidate`다. autodev는 전사 원본을 보관하지 않는다. 세션 JSONL은 형식이 버전마다 바뀌고 Claude Code는 기본 30일 뒤 지운다. 대신 capture는 노트의 `Observed` 절에 명령, 오류 출력, 결정 문장을 요약하지 않고 발췌로 옮기고, 같은 작업의 커밋·PR·Actions 실행을 영속 참조로 연결한다.
 
@@ -228,7 +228,7 @@ resolution: existed:kb-20261005-pnpm-lockfile-v9   # existed:<id> | none-needed 
 
 ### 4.3 주간 통합 (consolidate)
 
-primary 기기의 launchd가 주 1회 `autodev consolidate`를 실행한다. 먼저 `kb-lint --report`로 `stale_after`가 지난 페이지, 30일 넘게 `disputed`인 페이지, `revisit_after`가 지난 `deferred` 페이지를 뽑는다. 입력은 이 목록과, `intake`에서 병합된 어느 `consolidations/` 파일에도 없고 열린 통합 PR에도 들어 있지 않은 모든 항목이다. 출력은 `main`으로의 PR 한 건이다.
+primary 기기의 launchd가 주 1회 `autodev consolidate`를 실행한다. 먼저 `kb-lint --report`로 `stale_after`가 지난 페이지, 30일 넘게 `disputed`인 페이지, `revisit_after`가 지난 `deferred` 페이지, 그리고 결정 뒤 처리가 남은 radar 페이지(`accepted`인데 `Trial` 이슈가 없거나, `rejected`인데 `interests.yaml` 반영 기록이 없는 것)를 뽑는다. 처리 결과(이슈 링크, 반영한 키워드)는 그 통합의 `consolidations/` 파일에 남는다. 입력은 이 목록과, `intake`에서 병합된 어느 `consolidations/` 파일에도 없고 열린 통합 PR에도 들어 있지 않은 모든 항목이다. 출력은 `main`으로의 PR 한 건이다.
 
 - PR은 새 페이지 추가, 기존 페이지 대체, `index.md` 재생성, `radar/interests.yaml` 제안, `consolidations/YYYY-MM-DD.yaml`(페이지마다 처리한 intake 항목과 `gap` 확정 결과)만 담는다. 기존 페이지 본문을 제자리에서 고쳐 쓰지 않는다.
 - 에이전트가 페이지마다 최종 `adoption`을 제안하고, 병합이 그것을 확정한다. intake에 쓰는 기록의 `adoption`은 `candidate`뿐이다.
@@ -252,7 +252,7 @@ primary 기기의 launchd가 주 1회 `autodev consolidate`를 실행한다. 먼
 
 평가 정의는 항상 `main`의 것을 쓴다. 후보 PR이 `evals/`나 `bin/eval`을 함께 건드리면 CI가 리뷰 전에 거부한다. 자기 개선 시스템 다섯 개 모두에서 평가·기록 경로를 고치는 개조가 발견됐다 (2609.00069).
 
-결정은 `skills/ledger.md`에 한 줄(후보, diff 요약, 평가 표 링크, 결정, 거부 이유)로 남겨 같은 편집이 다시 제안되지 않게 한다. 병합 뒤 같은 `signature`가 재발하거나 평가가 회귀하면 `git revert`하고 장부에 적는다. 승격된 스킬은 `bin/sync`가 두 엔진에 설치한다.
+결정은 `skills/ledger.md`에 한 줄(후보, diff 요약, 평가 표 링크, 결정, 거부 이유)로 남겨 같은 편집이 다시 제안되지 않게 한다. 병합 뒤 같은 `signature`가 재발하거나 평가가 회귀하면 `git revert`하고 장부에 적는다. 승격된 스킬은 `bin/sync`가 두 엔진에 설치한다. `sync`는 매일 vault `main`을 먼저 fast-forward한 뒤 링크를 맞추므로, 브리프도 같은 최신 `main`을 읽는다.
 
 ## 5. 검색, radar, 결정
 
@@ -360,9 +360,9 @@ vault `AGENTS.md`에는 도구가 바뀌어도 유지될 규칙만 둔다. 적�
 | 단계 | 만드는 것 | 완료 기준 | 구현 때 정할 것 |
 | --- | --- | --- | --- |
 | 1. 정리와 규약 | autodev: 1절 삭제, README·SKILL.md 골격, `schema/`, `kb-lint`와 테스트, `intake-write`, CI 교체(job 이름 `ci` 유지), 이전 엔진 이슈(#7~#10) 정리. dev-knowledge: 비공개 전환, `intake` 브랜치, `main` ruleset과 CI, vault `AGENTS.md`, 기존 내용 이행, `index.md` 생성 | 두 저장소의 `ci`가 통과하고, 고의로 깨뜨린 프론트매터 다섯 종류와 intake 규칙 위반 두 종류를 `kb-lint`가 각각 잡는다 | 여러 기기의 동시 intake 쓰기(전용 clone, 잠금, rebase 재시도), 건마다 파일 하나인 intake 경로 규칙 |
-| 2. 경험 루프 | 훅 두 개, 세션 큐, `capture`, `brief`와 `references/brief.md`, 전역 지침, `sources`와 원천 커넥터(GitHub, Linear), `consolidate`, `review-sync`, `metrics`, launchd 작업 | 개인 프로젝트 작업 2주분이 inbox에 들어오고, 거절 스레드를 반영한 통합 PR 한 건이 병합되며, 측정 표가 두 번 나온다 | 이어진 세션의 증분 capture, 브랜치 생성 전 lookup과 PR의 연결, 재실행 시도별 로그, 필수 체크 묶음 정의, 로그 보존 기간이 짧은 저장소, intake 쓰기 실패의 다이제스트 전달 |
-| 3. radar와 다이제스트 | 수집 워크플로, `interests.yaml`, 도구 없는 채점, `Trial` 이슈 생성, `digest`, 표면 커넥터(macOS, Kaneo, Linear) | 2주 동안 radar 주 2건·결정 5건 상한이 지켜지고, 수집이 하루 빠진 뒤 복구되며, 채점 프로세스에 노출된 도구가 없음을 확인한다 | 수집 기록과 채점 기록의 파일 분리, 만료 처리 |
-| 4. 스킬 승격 | `evals/` 첫 세트, `bin/eval`, `skills/ledger.md`, 경로 거부 CI, `bin/sync` | 평가 세트가 스킬 없이 두 엔진에서 재현 가능하게 돌고, 후보 하나가 채택 또는 거부되어 장부에 남으며, 채택된 경우 두 엔진에서 로드된다 | 대조군 격리(임시 HOME·설정 디렉터리로 설치된 스킬 차단), 평가 에이전트의 쓰기 범위, 검사기 무결성, 스킬 링크 동기화와 revert 반영 |
+| 2. 경험 루프 | 훅 두 개, 세션 큐, `capture`, `brief`와 `references/brief.md`, 전역 지침, `sources`와 원천 커넥터(GitHub, Linear), `consolidate`, `review-sync`, `metrics`, launchd 작업 | 개인 프로젝트 작업 2주분이 inbox에 들어오고, 거절 스레드를 반영한 통합 PR 한 건이 병합되며, 측정 표가 두 번 나온다 | 이어진 세션의 증분 capture, 브랜치 생성 전이나 브랜치 이름 재사용 시 lookup과 PR의 연결, 원천 커넥터의 수집 커서를 intake에 영속 저장, 재실행 시도별 로그, 필수 체크 묶음 정의, 로그 보존 기간이 짧은 저장소, intake 쓰기 실패의 다이제스트 전달 |
+| 3. radar와 다이제스트 | 수집 워크플로, `interests.yaml`, 도구 없는 채점, `Trial` 이슈 생성, `digest`, 표면 커넥터(macOS, Kaneo, Linear) | 2주 동안 radar 주 2건·결정 5건 상한이 지켜지고, 수집이 하루 빠진 뒤 복구되며, 채점 프로세스에 노출된 도구가 없음을 확인한다 | 수집 기록과 채점 기록의 파일 분리, 만료 처리, 점수가 나중에 오르는 HN 글을 위한 겹치는 조회 구간 |
+| 4. 스킬 승격 | `evals/` 첫 세트, `bin/eval`, `skills/ledger.md`, 경로 거부 CI, `bin/sync` | 평가 세트가 스킬 없이 두 엔진에서 재현 가능하게 돌고, 후보 하나가 채택 또는 거부되어 장부에 남으며, 채택된 경우 두 엔진에서 로드된다 | 대조군 격리(임시 HOME·설정 디렉터리로 설치된 스킬 차단), 평가 에이전트의 쓰기 범위(Claude `--restricted`는 명령 도구를 빼므로 `--tools`로 다시 열어야 함), 검사기 무결성, 스킬 링크 동기화와 revert 반영 |
 
 ## 10. 채택하지 않는 것
 
