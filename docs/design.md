@@ -96,7 +96,7 @@ project = "autodev"
 
 - 커넥터는 Agent Host의 MCP 연결(Linear, Kaneo)이나 기존 CLI(`gh`)를 쓴다. autodev는 서버를 설치하거나 인증하거나 자격 증명을 저장하지 않는다.
 - 커넥터 하나는 `references/connectors/<kind>.md` 한 문서다. 무엇을 읽는지, 어떤 필터를 쓰는지, 항목을 어떻게 만들고 닫는지를 적는다.
-- 세션 외의 원천은 primary가 매일 마지막 수집 이후 바뀐 항목을 읽어 `inbox/` 후보로 만든다.
+- 세션 외의 원천은 primary가 매일 마지막 수집 이후 바뀐 항목을 읽어 `inbox/` 후보로 만든다. PR, 이슈, 태스크 본문은 외부 글이므로 가져오는 단계와 요약하는 단계를 나눈다. 가져오는 단계는 해당 커넥터의 읽기 도구만 허용하고 원문을 그대로 출력하며, 요약은 capture처럼 도구 없이 돌고, 파일 쓰기는 스크립트가 검증한 뒤 한다.
 - 업무 경험은 Linear 원천으로만 들어온다. 대상은 위 두 프로젝트에서 사용자가 담당하거나 만든 이슈다. Linear 목록 조회는 댓글 참여로 거를 수 없어 v1은 이 둘로 한정한다.
 - 결정의 정본은 vault PR 하나다. 표면은 열린 결정 PR의 링크와 상태를 미러링할 뿐 결정을 받지 않는다. 그래야 표면을 바꾸거나 여러 개 붙여도 결정이 갈라지지 않는다.
 - 표면이 닿지 않는 날은 그 표면만 건너뛴다. 다이제스트 파일과 macOS 알림은 항상 남는다.
@@ -142,7 +142,7 @@ related: []
 | `status` / `adoption` | 내용의 진위와 사람의 결정은 다른 축이다. `rejected`, `deferred`도 `wiki/`에 커밋해야 같은 후보가 다시 올라오지 않는다 |
 | `revisit_after` | 보류가 영구 거절과 같아지지 않게 한다. 날짜가 지나면 통합이 다시 후보로 올린다 |
 | `basis` | `observed`, `measured`인데 `sources`가 비면 lint 오류. 확인하지 않은 필드는 비운다 |
-| `supersedes`, `superseded_by` | 갱신은 편집이 아니라 대체다. 낡은 페이지는 남기고 `superseded`로 표시한다. `superseded_by`는 `accepted` 페이지만 가리킬 수 있다 |
+| `supersedes`, `superseded_by` | 갱신은 편집이 아니라 대체다. 낡은 페이지는 남기고 `superseded`로 표시한다. `superseded_by`는 브리프 후보 조건(아래)을 만족하는 페이지만 가리킬 수 있다. 그렇지 않으면 옛 페이지와 새 페이지가 둘 다 브리프에서 빠진다 |
 | `stale_after` + 본문 문장 | 날짜만으로는 모델이 낡은 근거를 버리지 못하고, 언제부터 안 맞는지 적으면 버린다 (2609.31342) |
 | `signature` | 6절의 재발 집계와 4.4절의 스킬 승격 조건이 이 문자열로 묶인다 |
 
@@ -287,7 +287,7 @@ vault `AGENTS.md`에는 도구가 바뀌어도 유지될 규칙만 둔다. 적�
 | 수집 | dev-knowledge의 GitHub Actions, 하루 1회 | arXiv(cs.AI/CL/SE), HF daily papers, HN(points>50), 관심 저장소 릴리스. 마지막 성공 시각부터 수집해 빠진 날을 복구한다. `main`의 `interests.yaml`로 LLM 없이 거르고 정본 ID로 중복을 없앤다 |
 | 채점 | primary의 launchd | 점수가 없는 수집 항목을 하루 최대 10건 채점한다. 후보로 올리는 일은 주간 통합이 한다(주 2건) |
 
-2차 게시물(블로그, 트윗, 요약 기사)은 새 항목을 만들지 않고 정본 항목의 관찰 수만 올린다. 이는 중복 방지이지 검증이 아니며, 외부 주장이 실무 지식이 되는 길은 3절의 `Trial` 경로 하나다.
+2차 게시물(블로그, 트윗, 요약 기사)은 새 후보를 만들지 않고 정본 ID를 가리키는 관찰 기록 파일 하나로 남는다. 관찰 수는 이 파일들을 세서 얻으므로 intake 기록을 고칠 필요가 없다. 이는 중복 방지이지 검증이 아니며, 외부 주장이 실무 지식이 되는 길은 3절의 `Trial` 경로 하나다.
 
 채점은 외부에서 온 글을 모델에 넣으므로 프롬프트 주입을 전제로 한다. 채점 프로세스는 `claude -p --tools "" --strict-mcp-config`로 도구와 MCP 없이 돌고, 정해진 JSON 스키마의 점수만 출력한다. 파일 쓰기는 스크립트가 출력을 검증한 뒤 한다. Codex의 `--sandbox read-only`는 셸 읽기와 MCP 도구를 없애지 않으므로 Codex 채점은 도구가 노출되지 않는 설정을 확인한 뒤에 허용한다.
 
@@ -334,7 +334,7 @@ vault `AGENTS.md`에는 도구가 바뀌어도 유지될 규칙만 둔다. 적�
 
 | 모드 | 언제 | 검사 |
 | --- | --- | --- |
-| `main` | PR CI | 스키마(enum, 날짜, `type`별 필수 필드, 빈 `sources`, `deferred`의 `revisit_after`, `wiki/`의 `session:` 근거), 관계(`id` 유일성, 대상 존재, `superseded_by`가 accepted를 가리킴, radar의 대체 금지), `index.md` 재생성 diff 없음, 스킬 PR의 `evals/` 동시 변경 금지 |
+| `main` | PR CI | 스키마(enum, 날짜, `type`별 필수 필드, 빈 `sources`, `deferred`의 `revisit_after`, `wiki/`의 `session:` 근거), 관계(`id` 유일성, 대상 존재, `superseded_by`가 브리프 후보를 가리킴, radar의 대체 금지), `index.md` 재생성 diff 없음, 스킬 PR의 `evals/` 동시 변경 금지 |
 | `report` | 통합 시작 | stale, 오래된 disputed, 기한 지난 deferred 목록. 오류가 아니라 통합의 입력 |
 | `intake` | 쓰기 직전 | `inbox/`가 모두 `candidate`, lookup 형식, intake 트리 밖 변경 없음, 기존 기록 수정 없음 |
 
@@ -361,7 +361,7 @@ vault `AGENTS.md`에는 도구가 바뀌어도 유지될 규칙만 둔다. 적�
 | --- | --- | --- | --- |
 | 1. 정리와 규약 | autodev: 1절 삭제, README·SKILL.md 골격, `schema/`, `kb-lint`와 테스트, `intake-write`, CI 교체(job 이름 `ci` 유지), 이전 엔진 이슈(#7~#10) 정리. dev-knowledge: 비공개 전환, `intake` 브랜치, `main` ruleset과 CI, vault `AGENTS.md`, 기존 내용 이행, `index.md` 생성 | 두 저장소의 `ci`가 통과하고, 고의로 깨뜨린 프론트매터 다섯 종류와 intake 규칙 위반 두 종류를 `kb-lint`가 각각 잡는다 | 여러 기기의 동시 intake 쓰기(전용 clone, 잠금, rebase 재시도), 건마다 파일 하나인 intake 경로 규칙 |
 | 2. 경험 루프 | 훅 두 개, 세션 큐, `capture`, `brief`와 `references/brief.md`, 전역 지침, `sources`와 원천 커넥터(GitHub, Linear), `consolidate`, `review-sync`, `metrics`, launchd 작업 | 개인 프로젝트 작업 2주분이 inbox에 들어오고, 거절 스레드를 반영한 통합 PR 한 건이 병합되며, 측정 표가 두 번 나온다 | 이어진 세션의 증분 capture, 브랜치 생성 전이나 브랜치 이름 재사용 시 lookup과 PR의 연결, 원천 커넥터의 수집 커서를 intake에 영속 저장, 재실행 시도별 로그, 필수 체크 묶음 정의, 로그 보존 기간이 짧은 저장소, intake 쓰기 실패의 다이제스트 전달 |
-| 3. radar와 다이제스트 | 수집 워크플로, `interests.yaml`, 도구 없는 채점, `Trial` 이슈 생성, `digest`, 표면 커넥터(macOS, Kaneo, Linear) | 2주 동안 radar 주 2건·결정 5건 상한이 지켜지고, 수집이 하루 빠진 뒤 복구되며, 채점 프로세스에 노출된 도구가 없음을 확인한다 | 수집 기록과 채점 기록의 파일 분리, 만료 처리, 점수가 나중에 오르는 HN 글을 위한 겹치는 조회 구간 |
+| 3. radar와 다이제스트 | 수집 워크플로, `interests.yaml`, 도구 없는 채점, `Trial` 이슈 생성, `digest`, 표면 커넥터(macOS, Kaneo, Linear) | 2주 동안 radar 주 2건·결정 5건 상한이 지켜지고, 수집이 하루 빠진 뒤 복구되며, 채점 프로세스에 노출된 도구가 없음을 확인한다 | 수집 기록과 채점 기록의 파일 분리, 만료 처리, `Trial` 이슈 중복 생성 방지(이슈 본문의 radar ID 표식을 먼저 검색), 점수가 나중에 오르는 HN 글을 위한 겹치는 조회 구간 |
 | 4. 스킬 승격 | `evals/` 첫 세트, `bin/eval`, `skills/ledger.md`, 경로 거부 CI, `bin/sync` | 평가 세트가 스킬 없이 두 엔진에서 재현 가능하게 돌고, 후보 하나가 채택 또는 거부되어 장부에 남으며, 채택된 경우 두 엔진에서 로드된다 | 대조군 격리(임시 HOME·설정 디렉터리로 설치된 스킬 차단), 평가 에이전트의 쓰기 범위(Claude `--restricted`는 명령 도구를 빼므로 `--tools`로 다시 열어야 함), 검사기 무결성, 스킬 링크 동기화와 revert 반영 |
 
 ## 10. 채택하지 않는 것
